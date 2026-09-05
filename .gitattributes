@@ -1,0 +1,3 @@
+# Los scripts que se ejecutan dentro de contenedores Linux deben mantener LF
+*.sh text eol=lf
+*.sql text eol=lf
