@@ -227,7 +227,8 @@ proyecto_php4/
 │   │                            #   una carpeta de specs por versión (v1, v2, …)
 │   │                            #   + la GUIA_IA de ESA versión (GUIA_IA1, GUIA_IA2…):
 │   │                            #   cómo reconstruirla desde 0 con ayuda de una IA
-│   ├── PARADIGMA_POO.md         # Material conceptual: POO, SOLID+capas, ACID,
+│   ├── ARRAYS_Y_SUPERGLOBALES.md  # Material conceptual: arreglos y superglobales,
+│   ├── PARADIGMA_POO.md         #   POO, SOLID+capas, ACID,
 │   ├── SOLID_CAPAS_PATRONES.md         #   Docker y SDD (un .md por tema)
 │   ├── PRINCIPIOS_ACID.md       #
 │   ├── CONCEPTOS_DOCKER.md      #
@@ -299,6 +300,7 @@ aceptación (se cierra con tag). Detalle completo:
 | [SDD y Spec Kit](docs/SDD_SPECKIT.md) | La metodología con la que se trabaja este curso: la spec manda sobre el código |
 | [Calidad de las pruebas](docs/CALIDAD_DE_PRUEBAS.md) | Cobertura, la métrica CRAP y mutation testing: cómo saber si sus pruebas de verdad protegen — y por qué hoy es reto opcional, no alcance del proyecto |
 | [Programación asincrónica](docs/PROGRAMACION_ASINCRONICA.md) | Qué resuelve el async/await en la web, qué se daña sin él (con diagramas), y cómo se ve en el código de este proyecto |
+| [Arreglos y superglobales en PHP](docs/ARRAYS_Y_SUPERGLOBALES.md) | Qué es un `array` en PHP y en qué se diferencia del de Java; el CRUD sobre un arreglo; las funciones de arreglo que este proyecto usa, con el conteo real; y las superglobales —`$_GET`, `$_POST`, `$_SERVER`, `$_SESSION`— con la línea del proyecto donde aparece cada una |
 | [El paradigma P.O.O. en PHP](docs/PARADIGMA_POO.md) | Qué es un paradigma, los 4 pilares, y las `interface` de PHP + la validación como frontera |
 | [SOLID, capas y patrones de diseño](docs/SOLID_CAPAS_PATRONES.md) | Los 5 principios y las capas — y en qué versión se demuestra cada uno |
 | [Principios ACID](docs/PRINCIPIOS_ACID.md) | Las 4 garantías transaccionales, por qué una facturación las exige, y el contraste con BASE |
