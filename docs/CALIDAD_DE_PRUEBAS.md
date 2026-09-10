@@ -18,11 +18,27 @@ existe la de rama: ¿se probaron el `if` Y el `else`?).
 **La trampa:** ejecutar una línea NO es verificarla. Esta prueba sube la
 cobertura y no protege nada:
 
+```php
+// Prueba HUECA: ejecuta el método... y no verifica NADA
+public function testCrearProducto(): void
+{
+    $creado = $this->servicio->crearProducto($datos);
+    // (sin assert: si crearProducto guarda mal, esta prueba PASA)
+}
 ```
-# Prueba HUECA: ejecuta el método... y no verifica NADA
-resultado = servicio.crear_producto(datos)
-# (sin assert: si crear_producto guarda mal, esta prueba PASA)
+
+La que sí protege lleva **una línea que puede fallar**:
+
+```php
+public function testCrearProductoGuardaElNombre(): void
+{
+    $creado = $this->servicio->crearProducto($datos);
+    $this->assertSame($datos['nombre'], $creado['nombre']);  // ← esta línea ES la prueba
+}
 ```
+
+Si borra el `assert`, la prueba sigue pasando **y sigue sumando la misma
+cobertura**. Ahí está el problema de la métrica.
 
 **Cómo leerla bien:** cobertura BAJA sí es una alarma confiable (hay
 código que nadie ejecuta jamás en pruebas); cobertura ALTA, sola, no
