@@ -435,7 +435,7 @@ REGLAS (no negociables):
 
 ## Por qué funciona (la lección del curso)
 
-Esto ES spec-driven development ([SDD_SPECKIT.md](SDD_SPECKIT.md)): la misma
+Esto ES spec-driven development ([SDD_SPECKIT.md](../../../SDD_SPECKIT.md)): la misma
 IA que con "hazme una API de productos en PHP" produce cualquier cosa, con
 una constitución + spec + plan + tareas produce EL sistema especificado — y
 usted puede verificarlo contra criterios escritos antes de la primera línea
