@@ -43,19 +43,19 @@ Esto es de la prueba de capas de **este** repositorio, en
 `api_facturas/pruebas/prueba_capas.php`:
 
 ```php
-// PREPARAR: el servicio, armado con un repositorio falso en memoria
+// PREPARAR (Arrange): el servicio, armado con un repositorio falso en memoria
 $servicio = new ServicioProducto(new RepositorioFalsoEnMemoria());
 
-// EJECUTAR: la operación que se quiere probar
+// EJECUTAR (Act): la operación que se quiere probar
 $servicio->crear(['codigo' => 'T1', 'nombre' => 'Test', 'stock' => 5, 'valorunitario' => 100.0]);
 
-// COMPROBAR: la línea que PUEDE FALLAR — esta línea ES la prueba
-verificar($servicio->listar(10)[0]->getCodigo() === 'T1', 'crear + listar');
+// COMPROBAR (Assert): la línea que PUEDE FALLAR — esta línea ES la prueba
+verificar($servicio->listar(10)[0]->getCodigo() === 'T1',     'crear + listar');
 ```
 
-> **Los tres comentarios en mayúscula no están en el archivo:** los agregué
-> aquí para señalar las partes. El código sí es el de su repositorio, línea
-> por línea — vaya y compárelo.
+> **Los comentarios en mayúscula no están en el archivo:** los agregué
+> aquí para señalar las partes. El código sí es el de su repositorio,
+> línea por línea — vaya y compárelo.
 
 
 **La tercera parte es la prueba.** Las dos primeras solo montan la escena. Si
