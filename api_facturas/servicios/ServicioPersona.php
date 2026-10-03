@@ -35,7 +35,7 @@ class ServicioPersona implements IServicioPersona
         $codigo = trim($codigo);
         if ($codigo === '') {
             throw new InvalidArgumentException(
-                'El código la persona no puede estar vacío.'
+                'El código de la persona no puede estar vacío.'
             );
         }
         return $codigo;

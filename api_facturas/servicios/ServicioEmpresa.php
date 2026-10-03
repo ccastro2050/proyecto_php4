@@ -35,7 +35,7 @@ class ServicioEmpresa implements IServicioEmpresa
         $codigo = trim($codigo);
         if ($codigo === '') {
             throw new InvalidArgumentException(
-                'El código la empresa no puede estar vacío.'
+                'El código de la empresa no puede estar vacío.'
             );
         }
         return $codigo;
