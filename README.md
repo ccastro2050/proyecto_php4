@@ -1,6 +1,6 @@
 # Proyecto PHP — versión 4: el mismo sistema contra tres motores
 
-Proyecto de curso (USB Medellín). Aquí NO se descarga un sistema terminado:
+Proyecto de curso (ITM). Aquí NO se descarga un sistema terminado:
 **se construye un sistema real por versiones en PHP puro**, guiado por
 especificaciones. El repositorio siempre contiene la **versión en curso,
 funcionando** — usted la ejecuta, la estudia y luego la **reconstruye desde
@@ -374,4 +374,4 @@ aceptación (se cierra con tag). Detalle completo:
 
 ---
 
-*Proyecto PHP · USB Medellín · Base de datos bdfacturas (facturación + RBAC).*
+*Proyecto PHP · ITM · Base de datos bdfacturas (facturación + RBAC).*
