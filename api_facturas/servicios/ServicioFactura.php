@@ -95,8 +95,27 @@ class ServicioFactura implements IServicioFactura
         );
     }
 
+    public function reemplazar(int $numero, array $datos): Factura
+    {
+        $numero = $this->validarNumero($numero);
+        // Si el número no existe, el procedimiento lo dice con su SIGNAL y
+        // el repositorio lo convierte en conflicto. No se comprueba antes
+        // por la misma razón de siempre: la base ya lo sabe.
+        return $this->repositorio->reemplazar(
+            $numero,
+            $datos['fkidcliente'],
+            $datos['fkidvendedor'],
+            $this->normalizarDetalle($datos['detalle']),
+        );
+    }
+
     public function anular(int $numero): array
     {
         return $this->repositorio->anular($this->validarNumero($numero));
+    }
+
+    public function eliminar(int $numero): array
+    {
+        return $this->repositorio->eliminar($this->validarNumero($numero));
     }
 }

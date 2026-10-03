@@ -302,14 +302,13 @@ if (str_starts_with($ruta, '/api/factura/')) {
 
     if ($metodo === 'GET') {
         $controlador->obtener($numero);
+    } elseif ($metodo === 'PUT') {
+        $controlador->reemplazar($numero, $body);
+    } elseif ($metodo === 'DELETE') {
+        $controlador->eliminar($numero);
     } else {
-        // PUT, PATCH y DELETE caen aquí y responden 405, y NO es un descuido:
-        // una factura emitida no se reescribe ni se borra. Se ANULA —con
-        // `POST /api/factura/{numero}/anular`—, que deja la fila con su número
-        // y su fecha y le devuelve el stock a los productos.
-        //
-        // Una factura que desaparece deja un hueco en la numeración; una que
-        // se edita cambia lo que alguien ya recibió impreso.
+        // PATCH cae aquí y responde 405. No es un descuido: es el
+        // enrutador diciendo que ese verbo no aplica a este recurso.
         responderNoPermitido();
     }
     return;

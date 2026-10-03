@@ -254,8 +254,24 @@ class RepositorioFacturaPostgres implements IRepositorioFactura
         return $this->releer((int) $crudo['factura']['numero']);
     }
 
+    public function reemplazar(int $numero, int $idCliente, int $idVendedor, array $renglones): Factura
+    {
+        $crudo = $this->llamarProcedimiento(
+            'sp_actualizar_factura_y_productosporfactura',
+            [$numero, $idCliente, $idVendedor, json_encode($renglones), 1]
+        );
+        return $this->releer((int) $crudo['factura']['numero']);
+    }
+
     public function anular(int $numero): array
     {
         return $this->llamarProcedimiento('sp_anular_factura', [$numero]);
+    }
+
+    public function eliminar(int $numero): array
+    {
+        return $this->llamarProcedimiento(
+            'sp_borrar_factura_y_productosporfactura', [$numero]
+        );
     }
 }
