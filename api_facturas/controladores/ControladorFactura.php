@@ -106,34 +106,6 @@ class ControladorFactura
     }
 
     // ------------------------------------------------------------------
-    // PUT /api/factura/{numero}  →  reemplazo COMPLETO
-    // ------------------------------------------------------------------
-    public function reemplazar(int $numero, array $body): void
-    {
-        // No hay PATCH de facturas, y no es un olvido: cambiar un renglón
-        // cambia el total y el stock, así que el detalle se reemplaza entero
-        // o no se toca. Un PATCH daría la impresión de que se puede editar
-        // "solo un pedacito", y no se puede.
-        $errores = $this->validarFactura($body);
-        if ($errores !== []) {
-            $this->responder(422, [
-                'estado' => 422, 'mensaje' => 'Datos inválidos.', 'errores' => $errores,
-            ]);
-            return;
-        }
-
-        try {
-            $factura = $this->servicio->reemplazar($numero, $body);
-            $this->responder(200, [
-                'estado' => 200, 'mensaje' => 'Factura reemplazada exitosamente.',
-                'factura' => $factura->toArray(),
-            ]);
-        } catch (Throwable $e) {
-            $this->responderError($e);
-        }
-    }
-
-    // ------------------------------------------------------------------
     // POST /api/factura/{numero}/anular  →  anular
     // ------------------------------------------------------------------
     public function anular(int $numero): void
@@ -148,22 +120,6 @@ class ControladorFactura
             $resultado = $this->servicio->anular($numero);
             $this->responder(200, [
                 'estado' => 200, 'mensaje' => 'Factura anulada exitosamente.',
-                'resultado' => $resultado,
-            ]);
-        } catch (Throwable $e) {
-            $this->responderError($e);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DELETE /api/factura/{numero}  →  borrar de verdad
-    // ------------------------------------------------------------------
-    public function eliminar(int $numero): void
-    {
-        try {
-            $resultado = $this->servicio->eliminar($numero);
-            $this->responder(200, [
-                'estado' => 200, 'mensaje' => 'Factura eliminada exitosamente.',
                 'resultado' => $resultado,
             ]);
         } catch (Throwable $e) {

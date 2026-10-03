@@ -679,52 +679,118 @@ if ($ruta === '/facturas' && $metodo === 'GET') {
     exit;
 }
 
-// ---- Nueva ----
+// ---- Emitir una factura ----
+//
+// LOS RENGLONES SE AGREGAN DE A UNO, y por eso esta pantalla necesita algo que
+// las demás no: un BORRADOR que sobreviva entre peticiones. Cada botón es una
+// petición distinta, y sin guardarlo en algún lado lo agregado se perdería.
+// Vive en `$_SESSION` (ver `borrador_de_factura()` al final del archivo).
+//
+// Cuatro acciones y UNA sola ruta: lo que las distingue es el `name="accion"`
+// del botón que se oprimió.
 if ($ruta === '/facturas/nueva') {
-    if ($metodo === 'GET') {
-        pintar('facturas_formulario', ['ficha' => null, 'editando' => false]
-            + catalogos_de_factura());
-        exit;
-    }
+    $b = borrador_de_factura();
 
-    $cuerpo = cuerpo_de_factura();
-    $r = crear_factura($cuerpo);
-    if ($r['ok']) {
-        $numero = $r['datos']['factura']['numero'] ?? null;
-        redirigir_con("/facturas/$numero", 'exito', "Se creó la factura $numero.");
-    }
+    if ($metodo === 'POST') {
+        // El maestro se guarda SIEMPRE, con cualquier botón: perder el cliente
+        // elegido por agregar un renglón sería castigar a quien lo eligió.
+        $b['cliente']  = trim((string) ($_POST['fkidcliente']  ?? $b['cliente']));
+        $b['vendedor'] = trim((string) ($_POST['fkidvendedor'] ?? $b['vendedor']));
+        $accion = $_POST['accion'] ?? '';
 
-    pintar('facturas_formulario',
-        ['ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores']]
-        + catalogos_de_factura());
-    exit;
-}
+        if ($accion === 'agregar') {
+            $precios = precios_de_productos();
+            $codigo   = trim((string) ($_POST['codigo'] ?? ''));
+            $cantidad = trim((string) ($_POST['cantidad'] ?? ''));
 
-// ---- Editar (reemplazo completo) ----
-// Va ANTES que la pantalla de ver, porque "/facturas/3/editar" también
-// empieza por "/facturas/". El orden de los `if` es parte del significado.
-if (preg_match('#^/facturas/(\d+)/editar$#', $ruta, $coincidencias)) {
-    $numero = (int) $coincidencias[1];
+            if (!isset($precios[$codigo])) {
+                guardar_borrador($b);
+                redirigir_con('/facturas/nueva', 'error', 'Elija un producto.');
+            }
+            if (!ctype_digit($cantidad) || (int) $cantidad < 1) {
+                guardar_borrador($b);
+                redirigir_con('/facturas/nueva', 'error', 'La cantidad tiene que ser 1 o más.');
+            }
 
-    if ($metodo === 'GET') {
-        $r = obtener_factura($numero);
-        if (!$r['ok']) {
-            redirigir_con('/facturas', 'error', $r['errores']);
+            // El mismo producto dos veces SUMA, no repite el renglón.
+            $encontrado = false;
+            foreach ($b['renglones'] as &$r) {
+                if ($r['codigo'] === $codigo) {
+                    $r['cantidad'] += (int) $cantidad;
+                    $encontrado = true;
+                    break;
+                }
+            }
+            unset($r);   // se rompe la referencia del foreach, que si no muerde
+
+            if (!$encontrado) {
+                $b['renglones'][] = [
+                    'codigo'   => $codigo,
+                    'cantidad' => (int) $cantidad,
+                    'nombre'   => $precios[$codigo]['nombre'],
+                    'precio'   => $precios[$codigo]['valorunitario'],
+                ];
+            }
+            guardar_borrador($b);
+            header('Location: /facturas/nueva');
+            exit;
         }
-        pintar('facturas_formulario',
-            ['ficha' => $r['datos'], 'editando' => true] + catalogos_de_factura());
-        exit;
+
+        if ($accion === 'quitar') {
+            $fuera = (string) ($_POST['quitar'] ?? '');
+            $b['renglones'] = array_values(array_filter(
+                $b['renglones'],
+                fn(array $r) => $r['codigo'] !== $fuera,
+            ));
+            guardar_borrador($b);
+            header('Location: /facturas/nueva');
+            exit;
+        }
+
+        if ($accion === 'limpiar') {
+            unset($_SESSION['borrador_factura']);
+            header('Location: /facturas/nueva');
+            exit;
+        }
+
+        if ($accion === 'emitir') {
+            if ($b['cliente'] === '' || $b['vendedor'] === '') {
+                guardar_borrador($b);
+                redirigir_con('/facturas/nueva', 'error', 'Elija el cliente y el vendedor.');
+            }
+            if (!$b['renglones']) {
+                guardar_borrador($b);
+                redirigir_con('/facturas/nueva', 'error', 'Agregue al menos un renglón.');
+            }
+
+            // VIAJAN el cliente, el vendedor y los renglones. NO viajan el
+            // subtotal ni el total: los calcula el disparador de la base.
+            $r = crear_factura([
+                'fkidcliente'  => (int) $b['cliente'],
+                'fkidvendedor' => (int) $b['vendedor'],
+                'detalle'      => array_map(
+                    fn(array $x) => ['codigo' => $x['codigo'], 'cantidad' => $x['cantidad']],
+                    $b['renglones'],
+                ),
+            ]);
+
+            if ($r['ok']) {
+                unset($_SESSION['borrador_factura']);
+                $numero = $r['datos']['factura']['numero'] ?? '';
+                redirigir_con("/facturas/$numero", 'exito',
+                    "Factura $numero emitida — los subtotales y el total los calculó la base de datos.");
+            }
+            guardar_borrador($b);
+            redirigir_con('/facturas/nueva', 'error', $r['errores']);
+        }
     }
 
-    $cuerpo = cuerpo_de_factura();
-    $r = reemplazar_factura($numero, $cuerpo);
-    if ($r['ok']) {
-        redirigir_con("/facturas/$numero", 'exito', "Se guardó la factura $numero.");
+    $total = 0.0;
+    foreach ($b['renglones'] as $r) {
+        $total += $r['cantidad'] * $r['precio'];
     }
-
     pintar('facturas_formulario',
-        ['ficha' => $cuerpo + ['numero' => $numero], 'editando' => true,
-         'errores' => $r['errores']] + catalogos_de_factura());
+        ['borrador' => $b, 'total_estimado' => $total] + catalogos_de_factura());
     exit;
 }
 
@@ -736,16 +802,6 @@ if (preg_match('#^/facturas/(\d+)/anular$#', $ruta, $coincidencias) && $metodo =
     $r['ok']
         ? redirigir_con('/facturas', 'exito',
             "Se anuló la factura $numero. El stock volvió a los productos.")
-        : redirigir_con('/facturas', 'error', $r['errores']);
-}
-
-// ---- Eliminar ----
-if (preg_match('#^/facturas/(\d+)/eliminar$#', $ruta, $coincidencias) && $metodo === 'POST') {
-    $numero = (int) $coincidencias[1];
-    $r = eliminar_factura($numero);
-
-    $r['ok']
-        ? redirigir_con('/facturas', 'exito', "Se eliminó la factura $numero.")
         : redirigir_con('/facturas', 'error', $r['errores']);
 }
 
@@ -799,32 +855,51 @@ function catalogos_de_factura(): array
  * Es una limitación real y está dicha en la spec, no escondida: para más
  * renglones de los que caben, la versión siguiente traerá otra solución.
  */
-function cuerpo_de_factura(): array
+/**
+ * EL BORRADOR DE LA FACTURA, que vive en la sesión.
+ *
+ * Hace falta porque los renglones se agregan DE A UNO y cada botón es una
+ * petición nueva: PHP no recuerda nada entre una y otra. En el front de Blazor
+ * esto no existe —el borrador vive en el circuito— y ésa es toda la diferencia
+ * entre los dos fronts.
+ *
+ * `cliente` y `vendedor` se guardan como texto porque así llegan del `<select>`
+ * y así se comparan al volver a pintarlo; al emitir se convierten a entero.
+ */
+function borrador_de_factura(): array
 {
-    $detalle = [];
-    $codigos    = $_POST['detalle_codigo']   ?? [];
-    $cantidades = $_POST['detalle_cantidad'] ?? [];
-
-    foreach ($codigos as $i => $codigo) {
-        $codigo   = trim((string) $codigo);
-        $cantidad = trim((string) ($cantidades[$i] ?? ''));
-
-        // Un renglón sin producto NO es un error: es una casilla que la
-        // persona dejó vacía porque no la necesitaba.
-        if ($codigo === '') {
-            continue;
-        }
-        $detalle[] = [
-            'codigo'   => $codigo,
-            'cantidad' => a_numero($cantidad, 'entero'),
+    if (!isset($_SESSION['borrador_factura'])) {
+        $_SESSION['borrador_factura'] = [
+            'cliente' => '', 'vendedor' => '', 'renglones' => [],
         ];
     }
+    return $_SESSION['borrador_factura'];
+}
 
-    return [
-        'fkidcliente'  => a_numero(trim($_POST['fkidcliente'] ?? ''), 'entero'),
-        'fkidvendedor' => a_numero(trim($_POST['fkidvendedor'] ?? ''), 'entero'),
-        'detalle'      => $detalle,
-    ];
+/** Devuelve el borrador a la sesión después de tocarlo. */
+function guardar_borrador(array $b): void
+{
+    $_SESSION['borrador_factura'] = $b;
+}
+
+/**
+ * Los productos indexados por su código, para armar el renglón sin volver a
+ * preguntarle a la API el nombre y el precio de lo que ya se listó.
+ *
+ * El precio se guarda en el borrador SOLO para mostrar el total estimado. El
+ * que queda en la base lo pone el disparador, y es el que manda — por eso este
+ * número no viaja al emitir.
+ */
+function precios_de_productos(): array
+{
+    $porCodigo = [];
+    foreach (listar_productos()['datos'] as $p) {
+        $porCodigo[(string) $p['codigo']] = [
+            'nombre'        => (string) ($p['nombre'] ?? $p['codigo']),
+            'valorunitario' => (float) ($p['valorunitario'] ?? 0),
+        ];
+    }
+    return $porCodigo;
 }
 
 /**

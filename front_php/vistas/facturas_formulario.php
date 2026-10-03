@@ -1,158 +1,166 @@
 <?php
 /**
- * El formulario de una factura: encabezado y detalle, en un solo envío.
+ * facturas_formulario.php — EMITIR UNA FACTURA.
  *
- * ======================================================================
- * POR QUÉ EL DETALLE SON CINCO RENGLONES FIJOS
- * ======================================================================
+ * La misma pantalla que en los otros tres cursos. Cuatro cosas que no son de
+ * adorno:
  *
- * Un formulario que deje agregar renglones sin límite necesita JavaScript, y
- * esta versión no lo usa: lo que se ve es PHP y HTML, no magia de un
- * framework (Artículo 2 de la constitución).
+ *   1. LOS RENGLONES SE AGREGAN DE A UNO. No hay un número fijo de casillas,
+ *      porque nadie sabe de antemano cuántas cosas va a vender.
  *
- * Así que la pantalla ofrece cinco casillas y **las que queden vacías se
- * ignoran** al armar el cuerpo (`cuerpo_de_factura()` en index.php).
+ *   2. EL TOTAL NO SE ENVÍA. Lo que se ve abajo es un cálculo para que la
+ *      persona sepa cuánto va — pero lo que queda guardado lo pone el
+ *      disparador. Si el front lo enviara habría dos fuentes de verdad, y el
+ *      día que no coincidan gana la que nadie revisó.
  *
- * Es una limitación de verdad, y está dicha aquí y en la especificación en
- * vez de escondida: una factura de seis productos no cabe en esta pantalla.
- * Se decidió así porque el contenido de la versión es maestro-detalle, no
- * interfaces dinámicas — y porque cinco renglones alcanzan para verlo
- * funcionar. La API sí acepta los que sean: la limitación es de la pantalla.
+ *   3. UN SOLO ENVÍO con el maestro y el detalle juntos. Una factura con tres
+ *      renglones no son cuatro peticiones: si la tercera fallara quedaría media
+ *      factura en la base, y «media factura» no es un estado que el negocio
+ *      reconozca.
  *
- * ======================================================================
- * Y POR QUÉ NO HAY «GUARDAR SOLO LO QUE CAMBIÉ»
- * ======================================================================
+ *   4. AQUÍ CADA BOTÓN ES UNA PETICIÓN y el borrador vive en `$_SESSION`; en el
+ *      front de Blazor vive en el circuito y no hay viaje. Ésa es la única
+ *      diferencia entre los dos: lo que se ve y lo que se puede hacer es lo
+ *      mismo.
  *
- * Las demás pantallas tienen dos botones. Ésta tiene uno, porque el recurso
- * no admite PATCH: cambiar un renglón cambia el total y el stock, así que el
- * detalle se reemplaza entero. Un segundo botón habría prometido algo que la
- * API responde con un 405.
+ * Las cuatro acciones del formulario se distinguen por el VALOR del botón que
+ * se oprimió (`name="accion"`), no por rutas distintas: agregar, quitar,
+ * limpiar y emitir.
+ *
+ * Variables: $clientes, $vendedores, $productos, $borrador, $total_estimado.
  */
 
-// Los renglones que ya tiene la factura (al editar), o ninguno (al crear).
-$renglones = $ficha['detalle'] ?? [];
-const RENGLONES_FACTURA = 5;
+declare(strict_types=1);
 ?>
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-  <div>
-    <h1 class="h3 mb-1">
-      <?= $editando ? 'Editar la factura ' . (int) ($ficha['numero'] ?? 0) : 'Nueva factura' ?>
-    </h1>
-    <p class="text-body-secondary mb-0">
-      <?php if ($editando): ?>
-        Se reemplaza el contenido completo: cliente, vendedor y todos los
-        renglones. El stock se ajusta solo.
-      <?php else: ?>
-        El número, el total y los subtotales los pone la base de datos.
-      <?php endif; ?>
-    </p>
-  </div>
-  <a class="btn btn-outline-secondary"
-     href="<?= $editando ? '/facturas/' . (int) ($ficha['numero'] ?? 0) : '/facturas' ?>">
-    Cancelar
-  </a>
-</div>
+<h1 class="h2 mb-3">Facturas</h1>
 
 <form method="post">
-
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-transparent"><strong>El encabezado</strong></div>
+  <section class="card mb-4">
     <div class="card-body">
-      <div class="row g-3">
+      <h2 class="h5 card-title mb-3">Emitir una factura</h2>
 
-        <div class="col-md-6">
+      <?php /* EL MAESTRO: a quién y quién vende */ ?>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
           <label class="form-label" for="fkidcliente">Cliente</label>
           <select class="form-select" id="fkidcliente" name="fkidcliente">
-            <option value="">— escoja —</option>
+            <option value="">— elija un cliente —</option>
             <?php foreach ($clientes as $c): ?>
               <option value="<?= (int) $c['id'] ?>"
-                <?= (int) ($ficha['fkidcliente'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>>
+                <?= (string) $borrador['cliente'] === (string) $c['id'] ? 'selected' : '' ?>>
                 Cliente <?= (int) $c['id'] ?> · persona <?= htmlspecialchars((string) $c['fkcodpersona']) ?>
               </option>
             <?php endforeach; ?>
           </select>
         </div>
-
-        <div class="col-md-6">
+        <div class="col-12 col-md-6">
           <label class="form-label" for="fkidvendedor">Vendedor</label>
           <select class="form-select" id="fkidvendedor" name="fkidvendedor">
-            <option value="">— escoja —</option>
+            <option value="">— elija un vendedor —</option>
             <?php foreach ($vendedores as $v): ?>
               <option value="<?= (int) $v['id'] ?>"
-                <?= (int) ($ficha['fkidvendedor'] ?? 0) === (int) $v['id'] ? 'selected' : '' ?>>
-                Vendedor <?= (int) $v['id'] ?> · carné <?= (int) $v['carnet'] ?>
+                <?= (string) $borrador['vendedor'] === (string) $v['id'] ? 'selected' : '' ?>>
+                Vendedor <?= (int) $v['id'] ?> · persona <?= htmlspecialchars((string) $v['fkcodpersona']) ?>
               </option>
             <?php endforeach; ?>
           </select>
         </div>
-
       </div>
-    </div>
-  </div>
 
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-      <strong>El detalle</strong>
-      <span class="text-body-secondary small">
-        Deje en blanco los renglones que no use
-      </span>
-    </div>
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th scope="col" style="width: 3rem;">#</th>
-            <th scope="col">Producto</th>
-            <th scope="col" style="width: 12rem;">Cantidad</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php for ($i = 0; $i < RENGLONES_FACTURA; $i++): ?>
-            <?php
-            // Lo que ya tenía la factura en ese renglón, si es que lo tenía.
-            // Al volver de un error el array trae 'codigo'/'cantidad'; al
-            // editar viene de la API con 'codigoProducto'.
-            $r = $renglones[$i] ?? [];
-            $codigoActual = (string) ($r['codigoProducto'] ?? $r['codigo'] ?? '');
-            $cantidadActual = (string) ($r['cantidad'] ?? '');
-            ?>
+      <hr>
+
+      <?php /* EL DETALLE: los renglones, que se arman AQUÍ sin tocar la API */ ?>
+      <h2 class="h5">Los renglones</h2>
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-7">
+          <label class="form-label" for="codigo">Producto</label>
+          <select class="form-select" id="codigo" name="codigo">
+            <option value="">— elija un producto —</option>
+            <?php foreach ($productos as $p): ?>
+              <option value="<?= htmlspecialchars((string) $p['codigo']) ?>">
+                <?= htmlspecialchars((string) $p['nombre']) ?>
+                — $ <?= htmlspecialchars(number_format((float) $p['valorunitario'], 2, ',', '.')) ?>
+                (stock <?= (int) $p['stock'] ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="cantidad">Cantidad</label>
+          <input class="form-control" type="number" min="1" value="1" id="cantidad" name="cantidad">
+        </div>
+        <div class="col-6 col-md-2">
+          <?php /* Este botón NO habla con la API: agrega a la tabla de abajo. */ ?>
+          <button class="btn btn-outline-primary w-100" name="accion" value="agregar">Agregar al detalle</button>
+        </div>
+      </div>
+
+      <?php if ($borrador['renglones']): ?>
+      <div class="table-responsive mt-3">
+        <table class="table table-sm align-middle">
+          <thead><tr>
+            <th>Producto</th>
+            <th class="text-end">Cantidad</th>
+            <th class="text-end">Valor unitario</th>
+            <th class="text-end">Subtotal</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            <?php foreach ($borrador['renglones'] as $r): ?>
             <tr>
-              <td class="text-body-secondary"><?= $i + 1 ?></td>
-              <td>
-                <select class="form-select" name="detalle_codigo[]">
-                  <option value="">— sin producto —</option>
-                  <?php foreach ($productos as $p): ?>
-                    <option value="<?= htmlspecialchars((string) $p['codigo']) ?>"
-                      <?= $codigoActual === (string) $p['codigo'] ? 'selected' : '' ?>>
-                      <?= htmlspecialchars((string) $p['nombre']) ?>
-                      — $ <?= htmlspecialchars(number_format((float) $p['valorunitario'], 2, ',', '.')) ?>
-                      (quedan <?= (int) $p['stock'] ?>)
-                    </option>
-                  <?php endforeach; ?>
-                </select>
+              <td><?= htmlspecialchars((string) $r['nombre']) ?></td>
+              <td class="text-end font-monospace"><?= (int) $r['cantidad'] ?></td>
+              <td class="text-end font-monospace">
+                $ <?= htmlspecialchars(number_format((float) $r['precio'], 2, ',', '.')) ?>
               </td>
-              <td>
-                <input class="form-control" type="number" min="1"
-                       name="detalle_cantidad[]"
-                       value="<?= htmlspecialchars($cantidadActual) ?>">
+              <td class="text-end font-monospace">
+                $ <?= htmlspecialchars(number_format($r['cantidad'] * $r['precio'], 2, ',', '.')) ?>
+              </td>
+              <td class="text-end">
+                <?php /* Quitar un renglón de esta lista tampoco llama a la API:
+                         todavía no se ha enviado nada. */ ?>
+                <button class="btn btn-sm btn-danger" name="accion" value="quitar"
+                        formnovalidate>Quitar</button>
+                <input type="hidden" name="quitar" value="<?= htmlspecialchars((string) $r['codigo']) ?>">
               </td>
             </tr>
-          <?php endfor; ?>
-        </tbody>
-      </table>
+            <?php endforeach; ?>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-end"><strong>Total estimado</strong></td>
+              <td class="text-end font-monospace">
+                <strong>$ <?= htmlspecialchars(number_format((float) $total_estimado, 2, ',', '.')) ?></strong>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p class="small text-body-secondary">
+        Este total es un cálculo para que usted sepa cuánto va.
+        <strong>No se envía:</strong> el total que queda guardado lo calcula el
+        disparador de la base de datos, y es el que manda.
+      </p>
+      <?php else: ?>
+      <div class="alert alert-secondary mt-3 text-center">Agregue al menos un renglón.</div>
+      <?php endif; ?>
+
+      <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+        <?php /* UN SOLO ENVÍO con el maestro y el detalle juntos. */ ?>
+        <button class="btn btn-primary" name="accion" value="emitir">Emitir la factura</button>
+        <button class="btn btn-link" name="accion" value="limpiar"
+                formnovalidate>Empezar de nuevo</button>
+        <a class="btn btn-link" href="/facturas">Volver a las facturas</a>
+      </div>
+
+      <?php if (!$clientes || !$vendedores || !$productos): ?>
+      <p class="small text-body-secondary mt-3 mb-0">
+        Para emitir una factura hacen falta un <a href="/clientes">cliente</a>, un
+        <a href="/vendedores">vendedor</a> y al menos un
+        <a href="/productos">producto</a>.
+      </p>
+      <?php endif; ?>
     </div>
-  </div>
-
-  <?php /* UN solo botón. Ver el comentario de arriba: este recurso no
-           admite «guardar solo lo que cambié». */ ?>
-  <button class="btn btn-primary" type="submit">
-    <?= $editando ? 'Reemplazar el contenido de la factura' : 'Crear la factura' ?>
-  </button>
-
-  <div class="form-text mt-3">
-    Al guardar, la base de datos descuenta el stock de cada producto y
-    calcula los subtotales y el total. Si algún producto no tiene unidades
-    suficientes, la factura no se guarda y aquí aparece el motivo.
-  </div>
-
+  </section>
 </form>

@@ -23,12 +23,8 @@ interface IServicioFactura
     /** Crea la factura con sus renglones y devuelve la factura guardada. */
     public function crear(array $datos): Factura;
 
-    /** Reemplaza cliente, vendedor y TODO el detalle. */
-    public function reemplazar(int $numero, array $datos): Factura;
 
     /** Anula: la factura queda 'anulada' y el stock vuelve. */
     public function anular(int $numero): array;
 
-    /** Borra la factura y su detalle. */
-    public function eliminar(int $numero): array;
 }

@@ -76,11 +76,6 @@
                   </form>
                 <?php endif; ?>
 
-                <form class="d-inline" method="post"
-                      action="/facturas/<?= (int) $f['numero'] ?>/eliminar"
-                      onsubmit="return confirm('¿Eliminar la factura <?= (int) $f['numero'] ?>? Esto la borra de verdad; anular deja el rastro.');">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
-                </form>
               </td>
             </tr>
           <?php endforeach; ?>

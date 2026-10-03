@@ -42,11 +42,6 @@ interface IRepositorioFactura
      */
     public function crear(int $idCliente, int $idVendedor, array $renglones): Factura;
 
-    /**
-     * Reemplaza el contenido de la factura: cliente, vendedor y **todo** el
-     * detalle. No es un PATCH — no existe «cambiar solo un renglón».
-     */
-    public function reemplazar(int $numero, int $idCliente, int $idVendedor, array $renglones): Factura;
 
     /**
      * Anula la factura: la deja en estado 'anulada' y **devuelve el stock**
@@ -54,6 +49,4 @@ interface IRepositorioFactura
      */
     public function anular(int $numero): array;
 
-    /** Borra la factura y su detalle. Devuelve lo que se borró. */
-    public function eliminar(int $numero): array;
 }
