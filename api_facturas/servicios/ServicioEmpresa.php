@@ -58,7 +58,7 @@ class ServicioEmpresa implements IServicioEmpresa
         $codigo = $this->validarClave($codigo);
         $empresa = $this->repositorio->obtenerPorClave($codigo);
         if ($empresa === null) {
-            throw new NoEncontradoExcepcion("No existe la empresa con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una empresa con codigo = $codigo");
         }
         return $empresa;
     }
@@ -80,7 +80,7 @@ class ServicioEmpresa implements IServicioEmpresa
         }
         $filasAfectadas = $this->repositorio->actualizar($codigo, $datos);
         if ($filasAfectadas === 0) {
-            throw new NoEncontradoExcepcion("No existe la empresa con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una empresa con codigo = $codigo");
         }
         return $filasAfectadas;
     }
@@ -90,7 +90,7 @@ class ServicioEmpresa implements IServicioEmpresa
         $codigo = $this->validarClave($codigo);
         $filasEliminadas = $this->repositorio->eliminar($codigo);
         if ($filasEliminadas === 0) {
-            throw new NoEncontradoExcepcion("No existe la empresa con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una empresa con codigo = $codigo");
         }
         return $filasEliminadas;
     }

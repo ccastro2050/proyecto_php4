@@ -58,7 +58,7 @@ class ServicioPersona implements IServicioPersona
         $codigo = $this->validarClave($codigo);
         $persona = $this->repositorio->obtenerPorClave($codigo);
         if ($persona === null) {
-            throw new NoEncontradoExcepcion("No existe la persona con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una persona con codigo = $codigo");
         }
         return $persona;
     }
@@ -82,7 +82,7 @@ class ServicioPersona implements IServicioPersona
         }
         $filasAfectadas = $this->repositorio->actualizar($codigo, $datos);
         if ($filasAfectadas === 0) {
-            throw new NoEncontradoExcepcion("No existe la persona con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una persona con codigo = $codigo");
         }
         return $filasAfectadas;
     }
@@ -92,7 +92,7 @@ class ServicioPersona implements IServicioPersona
         $codigo = $this->validarClave($codigo);
         $filasEliminadas = $this->repositorio->eliminar($codigo);
         if ($filasEliminadas === 0) {
-            throw new NoEncontradoExcepcion("No existe la persona con codigo = $codigo");
+            throw new NoEncontradoExcepcion("No existe una persona con codigo = $codigo");
         }
         return $filasEliminadas;
     }

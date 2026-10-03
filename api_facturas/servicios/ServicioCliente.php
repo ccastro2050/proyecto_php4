@@ -59,7 +59,7 @@ class ServicioCliente implements IServicioCliente
         $id = $this->validarClave($id);
         $cliente = $this->repositorio->obtenerPorClave($id);
         if ($cliente === null) {
-            throw new NoEncontradoExcepcion("No existe el cliente con id = $id");
+            throw new NoEncontradoExcepcion("No existe un cliente con id = $id");
         }
         return $cliente;
     }
@@ -86,7 +86,7 @@ class ServicioCliente implements IServicioCliente
         }
         $filasAfectadas = $this->repositorio->actualizar($id, $datos);
         if ($filasAfectadas === 0) {
-            throw new NoEncontradoExcepcion("No existe el cliente con id = $id");
+            throw new NoEncontradoExcepcion("No existe un cliente con id = $id");
         }
         return $filasAfectadas;
     }
@@ -96,7 +96,7 @@ class ServicioCliente implements IServicioCliente
         $id = $this->validarClave($id);
         $filasEliminadas = $this->repositorio->eliminar($id);
         if ($filasEliminadas === 0) {
-            throw new NoEncontradoExcepcion("No existe el cliente con id = $id");
+            throw new NoEncontradoExcepcion("No existe un cliente con id = $id");
         }
         return $filasEliminadas;
     }

@@ -59,7 +59,7 @@ class ServicioVendedor implements IServicioVendedor
         $id = $this->validarClave($id);
         $vendedor = $this->repositorio->obtenerPorClave($id);
         if ($vendedor === null) {
-            throw new NoEncontradoExcepcion("No existe el vendedor con id = $id");
+            throw new NoEncontradoExcepcion("No existe un vendedor con id = $id");
         }
         return $vendedor;
     }
@@ -86,7 +86,7 @@ class ServicioVendedor implements IServicioVendedor
         }
         $filasAfectadas = $this->repositorio->actualizar($id, $datos);
         if ($filasAfectadas === 0) {
-            throw new NoEncontradoExcepcion("No existe el vendedor con id = $id");
+            throw new NoEncontradoExcepcion("No existe un vendedor con id = $id");
         }
         return $filasAfectadas;
     }
@@ -96,7 +96,7 @@ class ServicioVendedor implements IServicioVendedor
         $id = $this->validarClave($id);
         $filasEliminadas = $this->repositorio->eliminar($id);
         if ($filasEliminadas === 0) {
-            throw new NoEncontradoExcepcion("No existe el vendedor con id = $id");
+            throw new NoEncontradoExcepcion("No existe un vendedor con id = $id");
         }
         return $filasEliminadas;
     }
