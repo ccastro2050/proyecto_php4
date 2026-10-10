@@ -961,6 +961,430 @@ if (preg_match('#^/facturas/(\d+)$#', $ruta, $coincidencias) && $metodo === 'GET
     exit;
 }
 
+// ======================================================================
+// ROLES  —  /roles        (v3)
+// ======================================================================
+
+// ---- El listado ----
+if ($ruta === '/roles' && $metodo === 'GET') {
+    $r = listar_roles();
+    pintar('roles', ['seccion' => 'lista', 'filas' => $r['datos'],
+                     'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Agregar ----
+if ($ruta === '/roles/nuevo') {
+    if ($metodo === 'GET') {
+        pintar('roles', ['seccion' => 'formulario', 'ficha' => null,
+                         'editando' => false]);
+        exit;
+    }
+
+    // El id NO viaja: lo genera la base de datos. Mandarlo desde el front
+    // sería decidir aquí una llave que no nos toca —y la API lo rechazaría—.
+    $cuerpo = ['nombre' => trim($_POST['nombre'] ?? '')];
+
+    $r = crear_rol($cuerpo);
+    if ($r['ok']) {
+        redirigir_con('/roles', 'exito', 'Se agregó el rol.');
+    }
+    pintar('roles', ['seccion' => 'formulario', 'ficha' => $cuerpo,
+                     'editando' => false, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Editar ----
+if (preg_match('#^/roles/(\d+)/editar$#', $ruta, $coincidencias)) {
+    $id = (int) $coincidencias[1];
+
+    if ($metodo === 'GET') {
+        $r = obtener_rol($id);
+        if (!$r['ok']) {
+            redirigir_con('/roles', 'error', $r['errores']);
+        }
+        pintar('roles', ['seccion' => 'formulario', 'ficha' => $r['datos'],
+                         'editando' => true]);
+        exit;
+    }
+
+    // Con UN solo campo editable, el PUT y el PATCH mandan exactamente lo
+    // mismo. Los dos botones siguen ahí a propósito: la diferencia no está
+    // en lo que hace esta pantalla, está en lo que PROMETE cada verbo —y en
+    // una ficha de dos campos se nota, como en productos—.
+    $cuerpo = ['nombre' => trim($_POST['nombre'] ?? '')];
+    $r = (($_POST['verbo'] ?? '') === 'completa')
+        ? reemplazar_rol($id, $cuerpo)
+        : actualizar_rol($id, $cuerpo);
+
+    if ($r['ok']) {
+        redirigir_con('/roles', 'exito', 'Se guardaron los cambios.');
+    }
+    pintar('roles', ['seccion' => 'formulario',
+                     'ficha' => ['id' => $id] + $cuerpo,
+                     'editando' => true, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Eliminar ----
+if (preg_match('#^/roles/(\d+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_rol((int) $coincidencias[1]);
+    $r['ok']
+        ? redirigir_con('/roles', 'exito', 'Se eliminó el rol.')
+        : redirigir_con('/roles', 'error', $r['errores']);
+}
+
+// ======================================================================
+// RUTAS  —  /rutas        (v3)
+//
+// Ojo con el nombre: aquí «ruta» es una INTERFAZ del sistema a la que se da
+// permiso —`/factura`—, no la dirección de una pantalla de este front
+// —`/facturas`—. El singular es el permiso; el plural, la pantalla.
+// ======================================================================
+
+// ---- El listado ----
+if ($ruta === '/rutas' && $metodo === 'GET') {
+    $r = listar_rutas();
+    pintar('rutas', ['seccion' => 'lista', 'filas' => $r['datos'],
+                     'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Agregar ----
+if ($ruta === '/rutas/nuevo') {
+    if ($metodo === 'GET') {
+        pintar('rutas', ['seccion' => 'formulario', 'ficha' => null,
+                         'editando' => false]);
+        exit;
+    }
+
+    $cuerpo = [
+        'ruta'        => trim($_POST['ruta'] ?? ''),
+        'descripcion' => trim($_POST['descripcion'] ?? ''),
+    ];
+
+    $r = crear_ruta($cuerpo);
+    if ($r['ok']) {
+        redirigir_con('/rutas', 'exito', 'Se agregó la ruta.');
+    }
+    pintar('rutas', ['seccion' => 'formulario', 'ficha' => $cuerpo,
+                     'editando' => false, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Editar ----
+if (preg_match('#^/rutas/(\d+)/editar$#', $ruta, $coincidencias)) {
+    $id = (int) $coincidencias[1];
+
+    if ($metodo === 'GET') {
+        $r = obtener_ruta($id);
+        if (!$r['ok']) {
+            redirigir_con('/rutas', 'error', $r['errores']);
+        }
+        pintar('rutas', ['seccion' => 'formulario', 'ficha' => $r['datos'],
+                         'editando' => true]);
+        exit;
+    }
+
+    if (($_POST['verbo'] ?? '') === 'completa') {
+        $cuerpo = [
+            'ruta'        => trim($_POST['ruta'] ?? ''),
+            'descripcion' => trim($_POST['descripcion'] ?? ''),
+        ];
+        $r = reemplazar_ruta($id, $cuerpo);
+    } else {
+        $cuerpo = [];
+        $v = trim($_POST['ruta'] ?? '');
+        if ($v !== '') { $cuerpo['ruta'] = $v; }
+        $v = trim($_POST['descripcion'] ?? '');
+        if ($v !== '') { $cuerpo['descripcion'] = $v; }
+        $r = actualizar_ruta($id, $cuerpo);
+    }
+
+    if ($r['ok']) {
+        redirigir_con('/rutas', 'exito', 'Se guardaron los cambios.');
+    }
+    pintar('rutas', ['seccion' => 'formulario',
+                     'ficha' => ['id' => $id] + $_POST,
+                     'editando' => true, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Eliminar ----
+if (preg_match('#^/rutas/(\d+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_ruta((int) $coincidencias[1]);
+    $r['ok']
+        ? redirigir_con('/rutas', 'exito', 'Se eliminó la ruta.')
+        : redirigir_con('/rutas', 'error', $r['errores']);
+}
+
+// ======================================================================
+// USUARIOS  —  /usuarios      (v3)
+//
+// LA PANTALLA DONDE SE VE QUE EL FRONT NO GUARDA CONTRASEÑAS. Se escriben,
+// viajan en el cuerpo de un POST y no vuelven: ni al repintar el formulario
+// tras un error, ni en un campo oculto, ni en la sesión. La API las hashea
+// con bcrypt y la lista NUNCA las devuelve —mire el JSON de `/api/usuario`:
+// trae el correo y nada más—.
+// ======================================================================
+
+// ---- El listado ----
+if ($ruta === '/usuarios' && $metodo === 'GET') {
+    $r = listar_usuarios();
+    pintar('usuarios', ['seccion' => 'lista', 'filas' => $r['datos'],
+                        'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Agregar ----
+if ($ruta === '/usuarios/nuevo') {
+    if ($metodo === 'GET') {
+        pintar('usuarios', ['seccion' => 'formulario', 'ficha' => null,
+                            'editando' => false]);
+        exit;
+    }
+
+    $cuerpo = [
+        'email'      => trim($_POST['email'] ?? ''),
+        'contrasena' => (string) ($_POST['contrasena'] ?? ''),
+    ];
+
+    $r = crear_usuario($cuerpo);
+    if ($r['ok']) {
+        redirigir_con('/usuarios', 'exito', 'Se creó el usuario.');
+    }
+    // Se repinta el correo, NO la contraseña.
+    pintar('usuarios', ['seccion' => 'formulario',
+                        'ficha' => ['email' => $cuerpo['email']],
+                        'editando' => false, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Editar (la contraseña) ----
+if (preg_match('#^/usuarios/([^/]+)/editar$#', $ruta, $coincidencias)) {
+    $email = urldecode($coincidencias[1]);
+
+    if ($metodo === 'GET') {
+        $r = obtener_usuario($email);
+        if (!$r['ok']) {
+            redirigir_con('/usuarios', 'error', $r['errores']);
+        }
+        pintar('usuarios', ['seccion' => 'formulario', 'ficha' => $r['datos'],
+                            'editando' => true]);
+        exit;
+    }
+
+    // Aquí el PUT y el PATCH se diferencian de verdad, y es el mejor
+    // ejemplo del proyecto: el PUT reemplaza la ficha —correo y contraseña—
+    // y el PATCH cambia SOLO la contraseña, que es lo que uno quiere el 99%
+    // de las veces.
+    if (($_POST['verbo'] ?? '') === 'completa') {
+        $r = reemplazar_usuario($email, [
+            'email'      => trim($_POST['email'] ?? ''),
+            'contrasena' => (string) ($_POST['contrasena'] ?? ''),
+        ]);
+    } else {
+        $cuerpo = [];
+        if (($_POST['contrasena'] ?? '') !== '') {
+            $cuerpo['contrasena'] = (string) $_POST['contrasena'];
+        }
+        $r = actualizar_usuario($email, $cuerpo);
+    }
+
+    if ($r['ok']) {
+        redirigir_con('/usuarios', 'exito', 'Se guardaron los cambios.');
+    }
+    pintar('usuarios', ['seccion' => 'formulario',
+                        'ficha' => ['email' => $email],
+                        'editando' => true, 'errores' => $r['errores']]);
+    exit;
+}
+
+// ---- Eliminar ----
+if (preg_match('#^/usuarios/([^/]+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_usuario(urldecode($coincidencias[1]));
+    $r['ok']
+        ? redirigir_con('/usuarios', 'exito', 'Se eliminó el usuario.')
+        : redirigir_con('/usuarios', 'error', $r['errores']);
+}
+
+// ======================================================================
+// PERMISOS POR ROL  —  /permisos      (v3, tabla puente `rutarol`)
+//
+// TRES RUTAS Y NO CINCO, y no es que falte trabajo: es que una fila de esta
+// tabla es una PAREJA de llaves foráneas. «Editar» un permiso no significa
+// nada —cambiarle el rol es quitar ese permiso y dar otro—, así que la
+// pantalla ofrece ver, dar y quitar. En la API el PUT y el PATCH están
+// escritos y comentados, con esta misma razón al lado.
+// ======================================================================
+
+// ---- El listado, con los dos catálogos para el formulario ----
+if ($ruta === '/permisos' && $metodo === 'GET') {
+    $r = listar_rutarol();
+    pintar('permisos', ['seccion' => 'lista', 'filas' => $r['datos'],
+                        'errores' => $r['errores']] + catalogos_de_permiso());
+    exit;
+}
+
+// ---- Dar un permiso ----
+if ($ruta === '/permisos/nuevo' && $metodo === 'POST') {
+    $r = crear_rutarol([
+        'fkidruta' => (int) ($_POST['fkidruta'] ?? 0),
+        'fkidrol'  => (int) ($_POST['fkidrol'] ?? 0),
+    ]);
+
+    $r['ok']
+        ? redirigir_con('/permisos', 'exito', 'Se dio el permiso.')
+        : redirigir_con('/permisos', 'error', $r['errores']);
+}
+
+// ---- Quitar un permiso: la pareja ENTERA va en la dirección ----
+if (preg_match('#^/permisos/(\d+)/(\d+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_rutarol((int) $coincidencias[1], (int) $coincidencias[2]);
+    $r['ok']
+        ? redirigir_con('/permisos', 'exito', 'Se quitó el permiso.')
+        : redirigir_con('/permisos', 'error', $r['errores']);
+}
+
+// ======================================================================
+// ROLES DE CADA USUARIO  —  /usuarios-roles   (v3, puente `rol_usuario`)
+//
+// El otro puente, con la misma forma: ver, dar y quitar.
+// ======================================================================
+
+if ($ruta === '/usuarios-roles' && $metodo === 'GET') {
+    $r = listar_rol_usuario();
+    pintar('usuarios_roles', ['seccion' => 'lista', 'filas' => $r['datos'],
+                              'errores' => $r['errores']]
+                              + catalogos_de_rol_usuario());
+    exit;
+}
+
+if ($ruta === '/usuarios-roles/nuevo' && $metodo === 'POST') {
+    $r = crear_rol_usuario([
+        'fkemail' => trim($_POST['fkemail'] ?? ''),
+        'fkidrol' => (int) ($_POST['fkidrol'] ?? 0),
+    ]);
+
+    $r['ok']
+        ? redirigir_con('/usuarios-roles', 'exito', 'Se dio el rol.')
+        : redirigir_con('/usuarios-roles', 'error', $r['errores']);
+}
+
+if (preg_match('#^/usuarios-roles/([^/]+)/(\d+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_rol_usuario(urldecode($coincidencias[1]),
+                              (int) $coincidencias[2]);
+    $r['ok']
+        ? redirigir_con('/usuarios-roles', 'exito', 'Se quitó el rol.')
+        : redirigir_con('/usuarios-roles', 'error', $r['errores']);
+}
+
+// ======================================================================
+// USUARIO CON SUS ROLES  —  /usuarios-con-roles       (v4)
+//
+// La pantalla del recurso que estrena la v4, y la única del front cuyo
+// formulario escribe en DOS tablas con una sola petición: el usuario y sus
+// roles. Detrás hay un procedimiento con transacción —si el segundo rol
+// falla, el usuario no se queda creado a medias—, y eso es precisamente lo
+// que esta pantalla permite comprobar: marque un rol que no exista y mire
+// la lista después.
+// ======================================================================
+
+if ($ruta === '/usuarios-con-roles' && $metodo === 'GET') {
+    $r = listar_usuarios_con_roles();
+    pintar('usuarios_con_roles', ['seccion' => 'lista', 'filas' => $r['datos'],
+                                  'errores' => $r['errores']]);
+    exit;
+}
+
+if ($ruta === '/usuarios-con-roles/nuevo') {
+    if ($metodo === 'GET') {
+        pintar('usuarios_con_roles',
+               ['seccion' => 'formulario', 'ficha' => null, 'editando' => false]
+               + ['roles' => listar_roles()['datos']]);
+        exit;
+    }
+
+    $r = crear_usuario_con_roles([
+        'email'      => trim($_POST['email'] ?? ''),
+        'contrasena' => (string) ($_POST['contrasena'] ?? ''),
+        // Las casillas llegan como texto; la API pide enteros.
+        'roles'      => array_map('intval', (array) ($_POST['roles'] ?? [])),
+    ]);
+
+    if ($r['ok']) {
+        redirigir_con('/usuarios-con-roles', 'exito',
+                      'Se creó el usuario con sus roles.');
+    }
+    pintar('usuarios_con_roles',
+           ['seccion' => 'formulario',
+            'ficha' => ['email' => trim($_POST['email'] ?? ''),
+                        'roles' => array_map('intval', (array) ($_POST['roles'] ?? []))],
+            'editando' => false, 'errores' => $r['errores'],
+            'roles' => listar_roles()['datos']]);
+    exit;
+}
+
+if (preg_match('#^/usuarios-con-roles/([^/]+)/editar$#', $ruta, $coincidencias)) {
+    $email = urldecode($coincidencias[1]);
+
+    if ($metodo === 'GET') {
+        $r = obtener_usuario_con_roles($email);
+        if (!$r['ok']) {
+            redirigir_con('/usuarios-con-roles', 'error', $r['errores']);
+        }
+        pintar('usuarios_con_roles',
+               ['seccion' => 'formulario', 'ficha' => $r['datos'],
+                'editando' => true, 'roles' => listar_roles()['datos']]);
+        exit;
+    }
+
+    $marcados = array_map('intval', (array) ($_POST['roles'] ?? []));
+
+    if (($_POST['verbo'] ?? '') === 'completa') {
+        // PUT: la contraseña Y los roles. Si el campo va vacío, el
+        // procedimiento deja la contraseña como estaba —es su convención, y
+        // el repositorio la respeta—.
+        $r = reemplazar_usuario_con_roles($email, [
+            'contrasena' => (string) ($_POST['contrasena'] ?? ''),
+            'roles'      => $marcados,
+        ]);
+    } else {
+        // PATCH: solo lo que se diligenció.
+        $cuerpo = ['roles' => $marcados];
+        if (($_POST['contrasena'] ?? '') !== '') {
+            $cuerpo['contrasena'] = (string) $_POST['contrasena'];
+        }
+        $r = actualizar_usuario_con_roles($email, $cuerpo);
+    }
+
+    if ($r['ok']) {
+        redirigir_con('/usuarios-con-roles', 'exito',
+                      'Se guardaron los cambios.');
+    }
+    pintar('usuarios_con_roles',
+           ['seccion' => 'formulario',
+            'ficha' => ['email' => $email,
+                        'roles' => array_map(fn ($id) => ['idrol' => $id], $marcados)],
+            'editando' => true, 'errores' => $r['errores'],
+            'roles' => listar_roles()['datos']]);
+    exit;
+}
+
+if (preg_match('#^/usuarios-con-roles/([^/]+)/eliminar$#', $ruta, $coincidencias)
+    && $metodo === 'POST') {
+    $r = eliminar_usuario_con_roles(urldecode($coincidencias[1]));
+    $r['ok']
+        ? redirigir_con('/usuarios-con-roles', 'exito',
+                        'Se eliminó el usuario y sus roles.')
+        : redirigir_con('/usuarios-con-roles', 'error', $r['errores']);
+}
+
 // ---- Cualquier otra cosa ----
 http_response_code(404);
 pintar('no_encontrada', ['ruta' => $ruta]);
@@ -1082,5 +1506,29 @@ function catalogos_de_vendedor(): array
 {
     return [
         'personas' => listar_personas()['datos'],
+    ];
+}
+
+/**
+ * Las rutas y los roles, para los dos desplegables de /permisos.
+ *
+ * Se piden a la API —dos peticiones— en vez de escribirlos a mano en la
+ * vista. Es más trabajo y es lo correcto: un rol nuevo aparece en el
+ * desplegable sin tocar el front.
+ */
+function catalogos_de_permiso(): array
+{
+    return [
+        'rutas' => listar_rutas()['datos'],
+        'roles' => listar_roles()['datos'],
+    ];
+}
+
+/** Los usuarios y los roles, para los desplegables de /usuarios-roles. */
+function catalogos_de_rol_usuario(): array
+{
+    return [
+        'usuarios' => listar_usuarios()['datos'],
+        'roles'    => listar_roles()['datos'],
     ];
 }

@@ -612,3 +612,261 @@ function consulta(string $nombre): array
     return ['ok' => false, 'datos' => [],
             'errores' => mensajes_de_error($r['cuerpo'])];
 }
+
+// ======================================================================
+// ROL  —  /api/rol        (v3)
+// ======================================================================
+
+/** Lista los roles. */
+function listar_roles(int $limite = 1000): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/rol?limite=$limite"));
+}
+
+/** Trae un rol por su id. */
+function obtener_rol(int $id): array
+{
+    return resultado_de_lectura(llamar_api('GET', "/api/rol/$id"));
+}
+
+/** Crea un rol. */
+function crear_rol(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/rol', $datos));
+}
+
+/** Reemplaza la ficha completa. */
+function reemplazar_rol(int $id, array $datos): array
+{
+    return resultado_de(llamar_api('PUT', "/api/rol/$id", $datos));
+}
+
+/** Actualiza solo lo enviado. */
+function actualizar_rol(int $id, array $datos): array
+{
+    return resultado_de(llamar_api('PATCH', "/api/rol/$id", $datos));
+}
+
+/** Elimina el rol. */
+function eliminar_rol(int $id): array
+{
+    return resultado_de(llamar_api('DELETE', "/api/rol/$id"));
+}
+
+// ======================================================================
+// RUTA  —  /api/ruta      (v3)
+//
+// «Ruta» aqui es una INTERFAZ del sistema a la que se da permiso, no una
+// direccion del front: `/factura` es el permiso, `/facturas` es la pantalla.
+// El singular y el plural distinguen las dos cosas en todo el proyecto.
+// ======================================================================
+
+/** Lista las rutas declaradas. */
+function listar_rutas(int $limite = 1000): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/ruta?limite=$limite"));
+}
+
+/** Trae una ruta por su id. */
+function obtener_ruta(int $id): array
+{
+    return resultado_de_lectura(llamar_api('GET', "/api/ruta/$id"));
+}
+
+/** Crea una ruta. */
+function crear_ruta(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/ruta', $datos));
+}
+
+/** Reemplaza la ficha completa. */
+function reemplazar_ruta(int $id, array $datos): array
+{
+    return resultado_de(llamar_api('PUT', "/api/ruta/$id", $datos));
+}
+
+/** Actualiza solo lo enviado. */
+function actualizar_ruta(int $id, array $datos): array
+{
+    return resultado_de(llamar_api('PATCH', "/api/ruta/$id", $datos));
+}
+
+/** Elimina la ruta. */
+function eliminar_ruta(int $id): array
+{
+    return resultado_de(llamar_api('DELETE', "/api/ruta/$id"));
+}
+
+// ======================================================================
+// USUARIO  —  /api/usuario    (v3)
+//
+// La llave es el CORREO, y va en la URL: por eso `rawurlencode`, que es lo
+// que convierte la arroba y el punto en algo que un servidor no interprete.
+// Sin el, un correo con un `+` —validisimo— rompe la direccion.
+// ======================================================================
+
+/** Lista los usuarios. Nunca trae la contrasena: la API no la devuelve. */
+function listar_usuarios(int $limite = 1000): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/usuario?limite=$limite"));
+}
+
+/** Trae un usuario por su correo. */
+function obtener_usuario(string $email): array
+{
+    return resultado_de_lectura(
+        llamar_api('GET', '/api/usuario/' . rawurlencode($email)));
+}
+
+/** Crea un usuario. La API hashea la contrasena; el front nunca la guarda. */
+function crear_usuario(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/usuario', $datos));
+}
+
+/** Reemplaza la ficha completa (correo y contrasena). */
+function reemplazar_usuario(string $email, array $datos): array
+{
+    return resultado_de(
+        llamar_api('PUT', '/api/usuario/' . rawurlencode($email), $datos));
+}
+
+/** Actualiza solo lo enviado —en la practica, la contrasena—. */
+function actualizar_usuario(string $email, array $datos): array
+{
+    return resultado_de(
+        llamar_api('PATCH', '/api/usuario/' . rawurlencode($email), $datos));
+}
+
+/** Elimina el usuario. */
+function eliminar_usuario(string $email): array
+{
+    return resultado_de(
+        llamar_api('DELETE', '/api/usuario/' . rawurlencode($email)));
+}
+
+// ======================================================================
+// PERMISOS POR ROL  —  /api/rutarol       (v3, tabla puente)
+//
+// DOS OPERACIONES Y NO CINCO, y es lo que hay que poder explicar: una fila
+// de esta tabla es una PAREJA de llaves foraneas y nada mas. Cambiarle el
+// rol no es «editarla»: es borrar un permiso y dar otro. En la API el PUT y
+// el PATCH estan escritos y COMENTADOS, con esa razon al lado.
+// ======================================================================
+
+/** Lista los permisos (ruta + rol), con los nombres ya resueltos. */
+function listar_rutarol(int $limite = 1000): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/rutarol?limite=$limite"));
+}
+
+/** Los roles que alcanzan una ruta. */
+function rutarol_por_ruta(int $idRuta): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/rutarol/ruta/$idRuta"));
+}
+
+/** Las rutas que alcanza un rol. */
+function rutarol_por_rol(int $idRol): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/rutarol/rol/$idRol"));
+}
+
+/** Da un permiso: la pareja (ruta, rol). */
+function crear_rutarol(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/rutarol', $datos));
+}
+
+/** Quita un permiso. La pareja ENTERA va en la direccion. */
+function eliminar_rutarol(int $idRuta, int $idRol): array
+{
+    return resultado_de(llamar_api('DELETE', "/api/rutarol/$idRuta/$idRol"));
+}
+
+// ======================================================================
+// ROLES DE CADA USUARIO  —  /api/rol-usuario    (v3, tabla puente)
+// ======================================================================
+
+/** Lista las parejas (usuario, rol). */
+function listar_rol_usuario(int $limite = 1000): array
+{
+    return resultado_de_listado(
+        llamar_api('GET', "/api/rol-usuario?limite=$limite"));
+}
+
+/** Los roles de un usuario. */
+function roles_de_usuario(string $email): array
+{
+    return resultado_de_listado(
+        llamar_api('GET', '/api/rol-usuario/usuario/' . rawurlencode($email)));
+}
+
+/** Los usuarios que tienen un rol. */
+function usuarios_de_rol(int $idRol): array
+{
+    return resultado_de_listado(llamar_api('GET', "/api/rol-usuario/rol/$idRol"));
+}
+
+/** Le da un rol a un usuario. */
+function crear_rol_usuario(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/rol-usuario', $datos));
+}
+
+/** Le quita un rol a un usuario. */
+function eliminar_rol_usuario(string $email, int $idRol): array
+{
+    return resultado_de(
+        llamar_api('DELETE', '/api/rol-usuario/' . rawurlencode($email) . "/$idRol"));
+}
+
+// ======================================================================
+// USUARIO CON SUS ROLES  —  /api/usuario-con-roles      (v4)
+//
+// El recurso que hace en UNA peticion lo que de otro modo son varias: crear
+// el usuario y darle sus roles, o cambiarle los roles de golpe. Detras hay
+// un procedimiento con transaccion, y por eso importa: si el segundo rol
+// falla, el usuario no se queda creado a medias.
+// ======================================================================
+
+/** Lista los usuarios con su lista de roles. UNA consulta, no N+1. */
+function listar_usuarios_con_roles(int $limite = 1000): array
+{
+    return resultado_de_listado(
+        llamar_api('GET', "/api/usuario-con-roles?limite=$limite"));
+}
+
+/** Trae un usuario con sus roles. */
+function obtener_usuario_con_roles(string $email): array
+{
+    return resultado_de_lectura(
+        llamar_api('GET', '/api/usuario-con-roles/' . rawurlencode($email)));
+}
+
+/** Crea el usuario y le da sus roles, de una vez. */
+function crear_usuario_con_roles(array $datos): array
+{
+    return resultado_de(llamar_api('POST', '/api/usuario-con-roles', $datos));
+}
+
+/** Reemplaza contrasena y roles. */
+function reemplazar_usuario_con_roles(string $email, array $datos): array
+{
+    return resultado_de(llamar_api('PUT',
+        '/api/usuario-con-roles/' . rawurlencode($email), $datos));
+}
+
+/** Cambia solo lo enviado: los roles, o la contrasena, o las dos. */
+function actualizar_usuario_con_roles(string $email, array $datos): array
+{
+    return resultado_de(llamar_api('PATCH',
+        '/api/usuario-con-roles/' . rawurlencode($email), $datos));
+}
+
+/** Borra el usuario Y sus roles. */
+function eliminar_usuario_con_roles(string $email): array
+{
+    return resultado_de(llamar_api('DELETE',
+        '/api/usuario-con-roles/' . rawurlencode($email)));
+}
