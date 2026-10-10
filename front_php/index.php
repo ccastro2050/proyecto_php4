@@ -164,14 +164,14 @@ if ($ruta === '/productos' && $metodo === 'GET') {
     $r = listar_productos();
     // Aun con error se pinta la pantalla: el usuario ve el aviso DENTRO de la
     // aplicación, no una página de error de PHP.
-    pintar('productos_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('productos', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
 // ---- Agregar ----
 if ($ruta === '/productos/nuevo') {
     if ($metodo === 'GET') {
-        pintar('productos_formulario', ['ficha' => null, 'editando' => false]);
+        pintar('productos', ['seccion' => 'formulario', 'ficha' => null, 'editando' => false]);
         exit;
     }
 
@@ -189,7 +189,7 @@ if ($ruta === '/productos/nuevo') {
 
     // Se devuelve el formulario CON lo que la persona había escrito: perder lo
     // digitado por un error de validación es castigarla dos veces.
-    pintar('productos_formulario', [
+    pintar('productos', ['seccion' => 'formulario', 
         'ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores'],
     ]);
     exit;
@@ -204,7 +204,7 @@ if (preg_match('#^/productos/([^/]+)/editar$#', $ruta, $coincidencias)) {
         if (!$r['ok']) {
             redirigir_con('/productos', 'error', $r['errores']);
         }
-        pintar('productos_formulario', ['ficha' => $r['datos'], 'editando' => true]);
+        pintar('productos', ['seccion' => 'formulario', 'ficha' => $r['datos'], 'editando' => true]);
         exit;
     }
 
@@ -237,7 +237,7 @@ if (preg_match('#^/productos/([^/]+)/editar$#', $ruta, $coincidencias)) {
         redirigir_con('/productos', 'exito', 'Se guardaron los cambios.');
     }
 
-    pintar('productos_formulario', [
+    pintar('productos', ['seccion' => 'formulario', 
         'ficha'    => ['codigo' => $clave] + $_POST,
         'editando' => true,
         'errores'  => $r['errores'],
@@ -266,14 +266,14 @@ if ($ruta === '/empresas' && $metodo === 'GET') {
     $r = listar_empresas();
     // Aun con error se pinta la pantalla: el usuario ve el aviso DENTRO de la
     // aplicación, no una página de error de PHP.
-    pintar('empresas_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('empresas', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
 // ---- Agregar ----
 if ($ruta === '/empresas/nuevo') {
     if ($metodo === 'GET') {
-        pintar('empresas_formulario', ['ficha' => null, 'editando' => false]);
+        pintar('empresas', ['seccion' => 'formulario', 'ficha' => null, 'editando' => false]);
         exit;
     }
 
@@ -289,7 +289,7 @@ if ($ruta === '/empresas/nuevo') {
 
     // Se devuelve el formulario CON lo que la persona había escrito: perder lo
     // digitado por un error de validación es castigarla dos veces.
-    pintar('empresas_formulario', [
+    pintar('empresas', ['seccion' => 'formulario', 
         'ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores'],
     ]);
     exit;
@@ -304,7 +304,7 @@ if (preg_match('#^/empresas/([^/]+)/editar$#', $ruta, $coincidencias)) {
         if (!$r['ok']) {
             redirigir_con('/empresas', 'error', $r['errores']);
         }
-        pintar('empresas_formulario', ['ficha' => $r['datos'], 'editando' => true]);
+        pintar('empresas', ['seccion' => 'formulario', 'ficha' => $r['datos'], 'editando' => true]);
         exit;
     }
 
@@ -331,7 +331,7 @@ if (preg_match('#^/empresas/([^/]+)/editar$#', $ruta, $coincidencias)) {
         redirigir_con('/empresas', 'exito', 'Se guardaron los cambios.');
     }
 
-    pintar('empresas_formulario', [
+    pintar('empresas', ['seccion' => 'formulario', 
         'ficha'    => ['codigo' => $clave] + $_POST,
         'editando' => true,
         'errores'  => $r['errores'],
@@ -360,14 +360,14 @@ if ($ruta === '/personas' && $metodo === 'GET') {
     $r = listar_personas();
     // Aun con error se pinta la pantalla: el usuario ve el aviso DENTRO de la
     // aplicación, no una página de error de PHP.
-    pintar('personas_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('personas', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
 // ---- Agregar ----
 if ($ruta === '/personas/nuevo') {
     if ($metodo === 'GET') {
-        pintar('personas_formulario', ['ficha' => null, 'editando' => false]);
+        pintar('personas', ['seccion' => 'formulario', 'ficha' => null, 'editando' => false]);
         exit;
     }
 
@@ -385,7 +385,7 @@ if ($ruta === '/personas/nuevo') {
 
     // Se devuelve el formulario CON lo que la persona había escrito: perder lo
     // digitado por un error de validación es castigarla dos veces.
-    pintar('personas_formulario', [
+    pintar('personas', ['seccion' => 'formulario', 
         'ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores'],
     ]);
     exit;
@@ -400,7 +400,7 @@ if (preg_match('#^/personas/([^/]+)/editar$#', $ruta, $coincidencias)) {
         if (!$r['ok']) {
             redirigir_con('/personas', 'error', $r['errores']);
         }
-        pintar('personas_formulario', ['ficha' => $r['datos'], 'editando' => true]);
+        pintar('personas', ['seccion' => 'formulario', 'ficha' => $r['datos'], 'editando' => true]);
         exit;
     }
 
@@ -433,7 +433,7 @@ if (preg_match('#^/personas/([^/]+)/editar$#', $ruta, $coincidencias)) {
         redirigir_con('/personas', 'exito', 'Se guardaron los cambios.');
     }
 
-    pintar('personas_formulario', [
+    pintar('personas', ['seccion' => 'formulario', 
         'ficha'    => ['codigo' => $clave] + $_POST,
         'editando' => true,
         'errores'  => $r['errores'],
@@ -462,14 +462,14 @@ if ($ruta === '/clientes' && $metodo === 'GET') {
     $r = listar_clientes();
     // Aun con error se pinta la pantalla: el usuario ve el aviso DENTRO de la
     // aplicación, no una página de error de PHP.
-    pintar('clientes_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('clientes', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
 // ---- Agregar ----
 if ($ruta === '/clientes/nuevo') {
     if ($metodo === 'GET') {
-        pintar('clientes_formulario', ['ficha' => null, 'editando' => false] + catalogos_de_cliente());
+        pintar('clientes', ['seccion' => 'formulario', 'ficha' => null, 'editando' => false] + catalogos_de_cliente());
         exit;
     }
 
@@ -489,7 +489,7 @@ if ($ruta === '/clientes/nuevo') {
 
     // Se devuelve el formulario CON lo que la persona había escrito: perder lo
     // digitado por un error de validación es castigarla dos veces.
-    pintar('clientes_formulario', [
+    pintar('clientes', ['seccion' => 'formulario', 
         'ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores'],
     ] + catalogos_de_cliente());
     exit;
@@ -506,7 +506,7 @@ if (preg_match('#^/clientes/([^/]+)/editar$#', $ruta, $coincidencias)) {
         if (!$r['ok']) {
             redirigir_con('/clientes', 'error', $r['errores']);
         }
-        pintar('clientes_formulario', ['ficha' => $r['datos'], 'editando' => true] + catalogos_de_cliente());
+        pintar('clientes', ['seccion' => 'formulario', 'ficha' => $r['datos'], 'editando' => true] + catalogos_de_cliente());
         exit;
     }
 
@@ -542,7 +542,7 @@ if (preg_match('#^/clientes/([^/]+)/editar$#', $ruta, $coincidencias)) {
         redirigir_con('/clientes', 'exito', 'Se guardaron los cambios.');
     }
 
-    pintar('clientes_formulario', [
+    pintar('clientes', ['seccion' => 'formulario', 
         'ficha'    => ['id' => $clave] + $_POST,
         'editando' => true,
         'errores'  => $r['errores'],
@@ -571,14 +571,14 @@ if ($ruta === '/vendedores' && $metodo === 'GET') {
     $r = listar_vendedores();
     // Aun con error se pinta la pantalla: el usuario ve el aviso DENTRO de la
     // aplicación, no una página de error de PHP.
-    pintar('vendedores_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('vendedores', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
 // ---- Agregar ----
 if ($ruta === '/vendedores/nuevo') {
     if ($metodo === 'GET') {
-        pintar('vendedores_formulario', ['ficha' => null, 'editando' => false] + catalogos_de_vendedor());
+        pintar('vendedores', ['seccion' => 'formulario', 'ficha' => null, 'editando' => false] + catalogos_de_vendedor());
         exit;
     }
 
@@ -595,7 +595,7 @@ if ($ruta === '/vendedores/nuevo') {
 
     // Se devuelve el formulario CON lo que la persona había escrito: perder lo
     // digitado por un error de validación es castigarla dos veces.
-    pintar('vendedores_formulario', [
+    pintar('vendedores', ['seccion' => 'formulario', 
         'ficha' => $cuerpo, 'editando' => false, 'errores' => $r['errores'],
     ] + catalogos_de_vendedor());
     exit;
@@ -612,7 +612,7 @@ if (preg_match('#^/vendedores/([^/]+)/editar$#', $ruta, $coincidencias)) {
         if (!$r['ok']) {
             redirigir_con('/vendedores', 'error', $r['errores']);
         }
-        pintar('vendedores_formulario', ['ficha' => $r['datos'], 'editando' => true] + catalogos_de_vendedor());
+        pintar('vendedores', ['seccion' => 'formulario', 'ficha' => $r['datos'], 'editando' => true] + catalogos_de_vendedor());
         exit;
     }
 
@@ -645,7 +645,7 @@ if (preg_match('#^/vendedores/([^/]+)/editar$#', $ruta, $coincidencias)) {
         redirigir_con('/vendedores', 'exito', 'Se guardaron los cambios.');
     }
 
-    pintar('vendedores_formulario', [
+    pintar('vendedores', ['seccion' => 'formulario', 
         'ficha'    => ['id' => $clave] + $_POST,
         'editando' => true,
         'errores'  => $r['errores'],
@@ -675,7 +675,7 @@ if (preg_match('#^/vendedores/([^/]+)/eliminar$#', $ruta, $coincidencias) && $me
 // ---- El listado ----
 if ($ruta === '/facturas' && $metodo === 'GET') {
     $r = listar_facturas();
-    pintar('facturas_lista', ['filas' => $r['datos'], 'errores' => $r['errores']]);
+    pintar('facturas', ['seccion' => 'lista', 'filas' => $r['datos'], 'errores' => $r['errores']]);
     exit;
 }
 
@@ -789,7 +789,7 @@ if ($ruta === '/facturas/nueva') {
     foreach ($b['renglones'] as $r) {
         $total += $r['cantidad'] * $r['precio'];
     }
-    pintar('facturas_formulario',
+    pintar('facturas', ['seccion' => 'formulario'] +
         ['borrador' => $b, 'total_estimado' => $total] + catalogos_de_factura());
     exit;
 }
@@ -813,7 +813,7 @@ if (preg_match('#^/facturas/(\d+)$#', $ruta, $coincidencias) && $metodo === 'GET
     if (!$r['ok']) {
         redirigir_con('/facturas', 'error', $r['errores']);
     }
-    pintar('facturas_detalle', ['factura' => $r['datos']]);
+    pintar('facturas', ['seccion' => 'detalle', 'factura' => $r['datos']]);
     exit;
 }
 
