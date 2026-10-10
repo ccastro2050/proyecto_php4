@@ -866,7 +866,66 @@ BEGIN
         BEGIN TRANSACTION;
 
         -- Insertar el usuario
-        INSERT INTO usuario (email, contrasena) VALUES (@p_email, @p_contrasena);
+-- ============================================================
+-- USUARIOS: LAS CONTRASENAS CON HASH, Y SE SABEN CUALES SON
+--
+-- Dos reglas, y la segunda es la que suele faltar:
+--
+--   1. NINGUNA fila guarda texto legible. La columna es VARCHAR(200) —y no
+--      20— precisamente porque un hash de bcrypt ocupa 60 caracteres.
+--
+--   2. Las contrasenas en claro estan ESCRITAS EN LA DOCUMENTACION, porque
+--      del hash no se puede volver a la clave —eso es lo que lo hace un
+--      hash—. Sin saberlas no hay forma de iniciar sesion, y sin iniciar
+--      sesion no se comprueba un solo criterio del control de acceso.
+--
+-- EL HASH ES BCRYPT COSTO 12, hecho con `password_hash()` de PHP. El
+-- `$2y$12$` del principio lo dice: `2y` es la variante que usa PHP y `12` el
+-- costo. Cada punto de costo DUPLICA el tiempo de calculo — y es para lo que
+-- se diseno bcrypt: encarecerlo cuando las maquinas sean mas rapidas, sin
+-- cambiar de funcion.
+--
+-- Y CADA HASH ES DISTINTO AUNQUE LA CLAVE SEA LA MISMA. Los dos usuarios de
+-- carlos.castro comparten contrasena y sus hash no se parecen: bcrypt trae
+-- SALT incorporado. Sin el, dos hash iguales delatarian que esas dos
+-- personas usan la misma clave.
+--
+-- Las contrasenas en claro, para las pruebas:
+--
+--   admin@correo.com                      admin123       Administrador
+--   vendedor1@correo.com                  vendedor123    Vendedor + Cajero
+--   jefe@correo.com                       jefe123        Administrador + Cajero + Contador
+--   cliente1@correo.com                   cliente123     Cliente
+--   test_encript@correo.com               test123        Administrador
+--   nuevo@correo.com                      nuevo123       Administrador + Vendedor + Cajero
+--   carlos.castro@usbmed.edu.co           carlos123      todos los roles
+--   carloscastro5033@correo.itm.edu.co    carlos123      todos los roles
+--
+-- LOS TRES QUE IMPORTAN PARA PROBAR EL CONTROL DE ACCESO:
+--
+--   admin@correo.com       Administrador: entra a las 15 rutas
+--   vendedor1@correo.com   Vendedor + Cajero: SOLO /home, /factura y /cliente
+--   cliente1@correo.com    Cliente: SOLO /home y /producto
+--
+-- Con esos tres se comprueba el 403: entrar como vendedor1 y pedir
+-- /api/usuario tiene que responder 403, no 401. Y NO porque la interfaz
+-- esconda el boton: escribiendo la direccion a mano.
+--
+-- NOTA DE HISTORIA, porque explica un comentario del repositorio: hasta
+-- octubre de 2026 dos de estas filas tenian la contrasena en TEXTO PLANO.
+-- `password_verify` devuelve false ante un hash malformado —sin lanzar nada—,
+-- asi que la API respondia «no coincide» en vez de caerse. Ese comportamiento
+-- se queda: un dato malo en la base de datos no puede tumbar la API.
+-- ============================================================
+INSERT INTO usuario (email, contrasena) VALUES
+(N'admin@correo.com', N'$2y$12$SUA9ETzVfL0T/uPDa73fw.muFMdy46LW12pHgMh1tB6V0eEO4foZ2'),
+(N'vendedor1@correo.com', N'$2y$12$CYVZtYBHcdzV0j9tYU91xusvpB4pZ14ocGTHrAgyaAYXWj27n5j5C'),
+(N'jefe@correo.com', N'$2y$12$33qnFFMZ..gpBa3L/kXCUupHCcMrfGTUchWzQjjCw5TBoSIgTOcjm'),
+(N'cliente1@correo.com', N'$2y$12$TscX3iQauO9ZWHDxd3mxe.nlqhgko9Lih/NFr3eA7zTgugvRhjrau'),
+(N'test_encript@correo.com', N'$2y$12$PvxiFmk0md3gwzWPSvNm2eyf7JZiGmSLzkaHVXh9X6ZhS58U7tGy2'),
+(N'nuevo@correo.com', N'$2y$12$7eGiaRC22NMoWTI/.K4ui.LUdnGc8ryifwrWFP8nHN17vDd/7C.TS'),
+(N'carlos.castro@usbmed.edu.co', N'$2y$12$lxMKrp7G9pYIFKGCFakWPucJDlyjSTlP1v2MoCxub6d/.szFk.Pcq'),
+(N'carloscastro5033@correo.itm.edu.co', N'$2y$12$h7EG/WmRZQYBINNP6jx.vuk2jwJT7xuZWWim5ZG709cJQ1dzeCZOS');
 
         -- Insertar los roles del usuario
         DECLARE rol_cursor CURSOR LOCAL FAST_FORWARD FOR

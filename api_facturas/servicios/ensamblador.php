@@ -57,6 +57,7 @@ require_once __DIR__ . '/ServicioFactura.php';
 require_once __DIR__ . '/ServicioRuta.php';
 require_once __DIR__ . '/ServicioUsuario.php';
 require_once __DIR__ . '/ServicioRolUsuario.php';
+require_once __DIR__ . '/ServicioSesion.php';
 require_once __DIR__ . '/ServicioRutaRol.php';
 require_once __DIR__ . '/ServicioRol.php';
 
@@ -70,6 +71,7 @@ require_once __DIR__ . '/../repositorios/RepositorioFacturaMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioAccesoMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolMariaDB.php';
 
@@ -83,6 +85,7 @@ require_once __DIR__ . '/../repositorios/RepositorioFacturaPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioAccesoPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolPostgres.php';
 
@@ -96,6 +99,7 @@ require_once __DIR__ . '/../repositorios/RepositorioFacturaSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioAccesoSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolSqlServer.php';
 
@@ -307,4 +311,51 @@ function crearServicioRolUsuario(): IServicioRolUsuario
     };
 
     return new ServicioRolUsuario($repositorio);
+}
+
+/**
+ * El repositorio de ACCESO, SIN servicio encima.
+ *
+ * Es la unica funcion del ensamblador que devuelve un repositorio pelado, y
+ * tiene su razon: quien lo usa es la guardia que hace valer el 403
+ * (`autorizacion/guardia.php`), y ahi no hay ninguna regla de negocio que
+ * aplicar — solo una pregunta que la base de datos contesta. Envolverlo en un
+ * servicio vacio seria una capa de adorno.
+ */
+function crearRepositorioAcceso(): IRepositorioAcceso
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    return match (motorActivo()) {
+        'postgres'  => new RepositorioAccesoPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioAccesoSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioAccesoMariaDB($dsn, $usuario, $clave),
+    };
+}
+
+/**
+ * El servicio de sesion: TRES repositorios del motor activo.
+ *
+ * Es el primero de la API que necesita mas de uno —usuario para la
+ * contrasena, el puente para los roles y el de acceso para las rutas del
+ * menu—, y se ve que la fabrica no sufre: tres llamadas a las mismas
+ * funciones de siempre.
+ */
+function crearServicioSesion(): IServicioSesion
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $usuarios = match (motorActivo()) {
+        'postgres'  => new RepositorioUsuarioPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioUsuarioSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioUsuarioMariaDB($dsn, $usuario, $clave),
+    };
+
+    $puente = match (motorActivo()) {
+        'postgres'  => new RepositorioRolUsuarioPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioRolUsuarioSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioRolUsuarioMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioSesion($usuarios, $puente, crearRepositorioAcceso());
 }

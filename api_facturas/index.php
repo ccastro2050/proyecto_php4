@@ -51,6 +51,8 @@ require_once __DIR__ . '/controladores/ControladorRuta.php';
 require_once __DIR__ . '/controladores/ControladorUsuario.php';
 require_once __DIR__ . '/controladores/ControladorRutaRol.php';
 require_once __DIR__ . '/controladores/ControladorRolUsuario.php';
+require_once __DIR__ . '/controladores/ControladorSesion.php';
+require_once __DIR__ . '/autorizacion/guardia.php';
 require_once __DIR__ . '/controladores/ControladorRol.php';
 
 // Toda respuesta de esta API es JSON — se avisa en el encabezado HTTP:
@@ -92,9 +94,126 @@ if ($ruta === '/' && $metodo === 'GET') {
             '/api/rutarol',
             '/api/rol',
         ],
-        'contratos' => 'docs/spec_kit/versiones/v4_sqlserver/6_contracts.md',
+        'sesion'    => 'POST /api/sesion para entrar; todo lo demas exige '
+                     . 'Authorization: Bearer <token>',
+        'contratos' => 'docs/spec_kit/versiones/v4_aplicativo/6_contracts.md',
     ], JSON_UNESCAPED_UNICODE);
     return;
+}
+
+// ======================================================================
+// 2.a  LA PUERTA DE LA CALLE Y LA GUARDIA  (v3)
+// ======================================================================
+//
+// Desde la v3 esta API está CERRADA. Lo que sigue decide quién pasa, y está
+// escrito con una idea: **que el olvido sea difícil**.
+//
+// En .NET la guardia es un atributo sobre la clase del controlador y protege
+// todos sus métodos, incluido el que alguien escriba mañana. Aquí no hay
+// framework que haga eso, así que en vez de llamar a la guardia bloque por
+// bloque —donde olvidarse es un descuido de una línea— se hace al revés:
+//
+//   1. una LISTA BLANCA con las rutas abiertas, que son dos y tienen por qué;
+//   2. UNA línea que exige sesión para todo lo demás, aquí arriba;
+//   3. un MAPA de ruta → permiso para el 403 de cada recurso.
+//
+// Para dejar un endpoint abierto por accidente habría que agregarlo a la
+// lista blanca, y eso se ve en el `diff`.
+
+/**
+ * Las DOS rutas abiertas, y la razón de cada una.
+ *
+ *   GET  /              el diagnóstico: un healthcheck que necesita
+ *                       credenciales no sirve de healthcheck
+ *   POST /api/sesion    la puerta de la calle: no puede exigir el token que
+ *                       ella misma entrega
+ */
+const RUTAS_ABIERTAS = ['/', '/api/sesion'];
+
+/**
+ * Qué permiso exige cada recurso. El nombre es el de la tabla `ruta`, letra
+ * por letra: si no coincide, `verificar_acceso_ruta` no lo encuentra y NADIE
+ * entra (fallar cerrado).
+ *
+ * Fíjese en que tres recursos comparten `/usuario`: administrar usuarios es
+ * UN permiso, aunque sean tres recursos. Si cada uno pidiera el suyo, dar de
+ * alta a alguien exigiría tres permisos y nadie se acordaría de los tres.
+ */
+const PERMISO_POR_RECURSO = [
+    'producto'    => '/producto',
+    'empresa'     => '/empresa',
+    'persona'     => '/persona',
+    'cliente'     => '/cliente',
+    'vendedor'    => '/vendedor',
+    'factura'     => '/factura',
+    'rol'         => '/rol',
+    'ruta'        => '/ruta',
+    'usuario'     => '/usuario',
+    'rol-usuario' => '/usuario',
+    'rutarol'     => '/permiso',
+];
+
+// ----------------------------------------------------------------------
+// POST /api/sesion — entrar. VA ANTES DE LA GUARDIA, porque es la puerta.
+// ----------------------------------------------------------------------
+if ($ruta === '/api/sesion') {
+    $controlador = new ControladorSesion(crearServicioSesion());
+    if ($metodo === 'POST') {
+        $controlador->entrar($body);
+    } elseif ($metodo === 'GET') {
+        // Los demás verbos de la sesión SÍ exigen token, y hablan de uno
+        // mismo: el correo sale del token, no del body ni de la URL.
+        $controlador->quienSoy(exigirSesion());
+    } elseif ($metodo === 'DELETE') {
+        $controlador->salir(exigirSesion());
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if ($ruta === '/api/sesion/renovar') {
+    $controlador = new ControladorSesion(crearServicioSesion());
+    if ($metodo === 'POST') {
+        $controlador->renovar(exigirSesion());
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ----------------------------------------------------------------------
+// GET /api/permisos/mios — las rutas de quien llama, para el menú
+// ----------------------------------------------------------------------
+if ($ruta === '/api/permisos/mios') {
+    $controlador = new ControladorSesion(crearServicioSesion());
+    if ($metodo === 'GET') {
+        $controlador->misPermisos(exigirSesion());
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ----------------------------------------------------------------------
+// LA GUARDIA, una sola vez, para TODO lo que no esté en la lista blanca
+// ----------------------------------------------------------------------
+if (!in_array($ruta, RUTAS_ABIERTAS, true)) {
+    // El recurso es el segundo segmento: /api/producto/PR001 → 'producto'.
+    $segmentos = explode('/', trim($ruta, '/'));
+    $recurso = $segmentos[1] ?? '';
+
+    if (isset(PERMISO_POR_RECURSO[$recurso])) {
+        // 401 si no hay token; 403 si lo hay y le falta el permiso. Las dos
+        // respuestas salen de aquí y cortan la ejecución: después de esta
+        // línea, o hay sesión con permiso o la petición ya terminó.
+        exigirPermiso(PERMISO_POR_RECURSO[$recurso]);
+    } else {
+        // Una ruta que no es de ningún recurso conocido: al menos se exige
+        // sesión. Si no existe, el 404 del final la atiende — pero no sin
+        // identificarse.
+        exigirSesion();
+    }
 }
 
 // ======================================================================

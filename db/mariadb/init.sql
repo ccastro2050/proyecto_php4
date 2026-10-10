@@ -708,7 +708,13 @@ DELIMITER $$
 --     "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE crear_usuario_con_roles(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     IN p_contrasena VARCHAR(200),
     IN p_roles_json JSON,
     OUT p_resultado JSON
@@ -720,7 +726,66 @@ BEGIN
     DECLARE v_roles_json TEXT;
 
     -- Insertar el usuario
-    INSERT INTO usuario (email, contrasena) VALUES (p_email, p_contrasena);
+-- ============================================================
+-- USUARIOS: LAS CONTRASENAS CON HASH, Y SE SABEN CUALES SON
+--
+-- Dos reglas, y la segunda es la que suele faltar:
+--
+--   1. NINGUNA fila guarda texto legible. La columna es VARCHAR(200) —y no
+--      20— precisamente porque un hash de bcrypt ocupa 60 caracteres.
+--
+--   2. Las contrasenas en claro estan ESCRITAS EN LA DOCUMENTACION, porque
+--      del hash no se puede volver a la clave —eso es lo que lo hace un
+--      hash—. Sin saberlas no hay forma de iniciar sesion, y sin iniciar
+--      sesion no se comprueba un solo criterio del control de acceso.
+--
+-- EL HASH ES BCRYPT COSTO 12, hecho con `password_hash()` de PHP. El
+-- `$2y$12$` del principio lo dice: `2y` es la variante que usa PHP y `12` el
+-- costo. Cada punto de costo DUPLICA el tiempo de calculo — y es para lo que
+-- se diseno bcrypt: encarecerlo cuando las maquinas sean mas rapidas, sin
+-- cambiar de funcion.
+--
+-- Y CADA HASH ES DISTINTO AUNQUE LA CLAVE SEA LA MISMA. Los dos usuarios de
+-- carlos.castro comparten contrasena y sus hash no se parecen: bcrypt trae
+-- SALT incorporado. Sin el, dos hash iguales delatarian que esas dos
+-- personas usan la misma clave.
+--
+-- Las contrasenas en claro, para las pruebas:
+--
+--   admin@correo.com                      admin123       Administrador
+--   vendedor1@correo.com                  vendedor123    Vendedor + Cajero
+--   jefe@correo.com                       jefe123        Administrador + Cajero + Contador
+--   cliente1@correo.com                   cliente123     Cliente
+--   test_encript@correo.com               test123        Administrador
+--   nuevo@correo.com                      nuevo123       Administrador + Vendedor + Cajero
+--   carlos.castro@usbmed.edu.co           carlos123      todos los roles
+--   carloscastro5033@correo.itm.edu.co    carlos123      todos los roles
+--
+-- LOS TRES QUE IMPORTAN PARA PROBAR EL CONTROL DE ACCESO:
+--
+--   admin@correo.com       Administrador: entra a las 15 rutas
+--   vendedor1@correo.com   Vendedor + Cajero: SOLO /home, /factura y /cliente
+--   cliente1@correo.com    Cliente: SOLO /home y /producto
+--
+-- Con esos tres se comprueba el 403: entrar como vendedor1 y pedir
+-- /api/usuario tiene que responder 403, no 401. Y NO porque la interfaz
+-- esconda el boton: escribiendo la direccion a mano.
+--
+-- NOTA DE HISTORIA, porque explica un comentario del repositorio: hasta
+-- octubre de 2026 dos de estas filas tenian la contrasena en TEXTO PLANO.
+-- `password_verify` devuelve false ante un hash malformado —sin lanzar nada—,
+-- asi que la API respondia «no coincide» en vez de caerse. Ese comportamiento
+-- se queda: un dato malo en la base de datos no puede tumbar la API.
+-- ============================================================
+INSERT INTO usuario (email, contrasena) VALUES
+('admin@correo.com', '$2y$12$SUA9ETzVfL0T/uPDa73fw.muFMdy46LW12pHgMh1tB6V0eEO4foZ2'),
+('vendedor1@correo.com', '$2y$12$CYVZtYBHcdzV0j9tYU91xusvpB4pZ14ocGTHrAgyaAYXWj27n5j5C'),
+('jefe@correo.com', '$2y$12$33qnFFMZ..gpBa3L/kXCUupHCcMrfGTUchWzQjjCw5TBoSIgTOcjm'),
+('cliente1@correo.com', '$2y$12$TscX3iQauO9ZWHDxd3mxe.nlqhgko9Lih/NFr3eA7zTgugvRhjrau'),
+('test_encript@correo.com', '$2y$12$PvxiFmk0md3gwzWPSvNm2eyf7JZiGmSLzkaHVXh9X6ZhS58U7tGy2'),
+('nuevo@correo.com', '$2y$12$7eGiaRC22NMoWTI/.K4ui.LUdnGc8ryifwrWFP8nHN17vDd/7C.TS'),
+('carlos.castro@usbmed.edu.co', '$2y$12$lxMKrp7G9pYIFKGCFakWPucJDlyjSTlP1v2MoCxub6d/.szFk.Pcq'),
+('carloscastro5033@correo.itm.edu.co', '$2y$12$h7EG/WmRZQYBINNP6jx.vuk2jwJT7xuZWWim5ZG709cJQ1dzeCZOS');
 
     -- Insertar los roles del usuario
     SET v_count = JSON_LENGTH(p_roles_json);
@@ -754,7 +819,13 @@ END$$
 --     "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE actualizar_usuario_con_roles(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     IN p_contrasena VARCHAR(200),
     IN p_roles JSON,
     OUT p_resultado JSON
@@ -803,7 +874,13 @@ END$$
 --     "p_email": "user@correo.com", "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE eliminar_usuario_con_roles(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     OUT p_resultado JSON
 )
 BEGIN
@@ -835,7 +912,13 @@ END$$
 --     "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE actualizar_roles_usuario(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     IN p_roles_json JSON,
     OUT p_resultado JSON
 )
@@ -884,7 +967,13 @@ END$$
 --     "p_email": "admin@correo.com", "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE consultar_usuario_con_roles(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     OUT p_resultado JSON
 )
 BEGIN
@@ -961,7 +1050,13 @@ DELIMITER $$
 --     "p_resultado": null }
 -- ------------------------------------------------------------
 CREATE PROCEDURE verificar_acceso_ruta(
-    IN p_email VARCHAR(100),
+    -- La colacion va DECLARADA y no se deja al servidor: las tablas
+    -- se crean con utf8mb4_unicode_ci, y MariaDB 11.5 cambio la
+    -- colacion por defecto a utf8mb4_uca1400_ai_ci. Sin esta linea,
+    -- comparar `u.email = p_email` revienta con el error 1267
+    -- —«Illegal mix of collations»— en 11.8 y funciona en 10.x: el
+    -- mismo script, dos comportamientos, segun el motor debajo.
+    IN p_email VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     IN p_fkidruta INT,
     OUT p_resultado JSON
 )
