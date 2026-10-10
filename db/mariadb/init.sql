@@ -302,6 +302,31 @@ BEGIN
     DECLARE v_productos_json TEXT;
     DECLARE v_msg VARCHAR(500);
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     SET v_minimo = COALESCE(NULLIF(p_minimo_detalle, 0), 1);
 
     IF p_productos IS NULL OR JSON_LENGTH(p_productos) < v_minimo THEN
@@ -354,6 +379,8 @@ BEGIN
     WHERE pf.fknumfactura = v_numfactura;
 
     SET p_resultado = CONCAT('{"factura":', v_factura_json, ',"productos":', COALESCE(v_productos_json, '[]'), '}');
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -517,6 +544,31 @@ BEGIN
     DECLARE v_estado VARCHAR(10);
     DECLARE v_msg VARCHAR(500);
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     IF NOT EXISTS (SELECT 1 FROM factura WHERE numero = p_numero) THEN
         SET v_msg = CONCAT('Factura ', p_numero, ' no existe');
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
@@ -588,6 +640,8 @@ BEGIN
     WHERE pf.fknumfactura = p_numero;
 
     SET p_resultado = CONCAT('{"factura":', v_factura_json, ',"productos":', COALESCE(v_productos_json, '[]'), '}');
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -607,6 +661,31 @@ BEGIN
     DECLARE v_total DECIMAL(18,2);
     DECLARE v_cantidad_productos INT;
     DECLARE v_msg VARCHAR(500);
+
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
 
     IF NOT EXISTS (SELECT 1 FROM factura WHERE numero = p_numero) THEN
         SET v_msg = CONCAT('Factura ', p_numero, ' no existe');
@@ -630,6 +709,8 @@ BEGIN
         'total_eliminado', v_total,
         'productos_eliminados', v_cantidad_productos
     );
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -652,6 +733,31 @@ BEGIN
     DECLARE v_cantidad_productos INT;
     DECLARE v_estado VARCHAR(10);
     DECLARE v_msg VARCHAR(500);
+
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
 
     -- Validar que la factura existe
     IF NOT EXISTS (SELECT 1 FROM factura WHERE numero = p_numero) THEN
@@ -687,6 +793,8 @@ BEGIN
         'productos_afectados', v_cantidad_productos,
         'estado', 'anulada'
     );
+
+    COMMIT;
 END$$
 
 DELIMITER ;
@@ -725,67 +833,33 @@ BEGIN
     DECLARE v_idrol INT;
     DECLARE v_roles_json TEXT;
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     -- Insertar el usuario
--- ============================================================
--- USUARIOS: LAS CONTRASENAS CON HASH, Y SE SABEN CUALES SON
---
--- Dos reglas, y la segunda es la que suele faltar:
---
---   1. NINGUNA fila guarda texto legible. La columna es VARCHAR(200) —y no
---      20— precisamente porque un hash de bcrypt ocupa 60 caracteres.
---
---   2. Las contrasenas en claro estan ESCRITAS EN LA DOCUMENTACION, porque
---      del hash no se puede volver a la clave —eso es lo que lo hace un
---      hash—. Sin saberlas no hay forma de iniciar sesion, y sin iniciar
---      sesion no se comprueba un solo criterio del control de acceso.
---
--- EL HASH ES BCRYPT COSTO 12, hecho con `password_hash()` de PHP. El
--- `$2y$12$` del principio lo dice: `2y` es la variante que usa PHP y `12` el
--- costo. Cada punto de costo DUPLICA el tiempo de calculo — y es para lo que
--- se diseno bcrypt: encarecerlo cuando las maquinas sean mas rapidas, sin
--- cambiar de funcion.
---
--- Y CADA HASH ES DISTINTO AUNQUE LA CLAVE SEA LA MISMA. Los dos usuarios de
--- carlos.castro comparten contrasena y sus hash no se parecen: bcrypt trae
--- SALT incorporado. Sin el, dos hash iguales delatarian que esas dos
--- personas usan la misma clave.
---
--- Las contrasenas en claro, para las pruebas:
---
---   admin@correo.com                      admin123       Administrador
---   vendedor1@correo.com                  vendedor123    Vendedor + Cajero
---   jefe@correo.com                       jefe123        Administrador + Cajero + Contador
---   cliente1@correo.com                   cliente123     Cliente
---   test_encript@correo.com               test123        Administrador
---   nuevo@correo.com                      nuevo123       Administrador + Vendedor + Cajero
---   carlos.castro@usbmed.edu.co           carlos123      todos los roles
---   carloscastro5033@correo.itm.edu.co    carlos123      todos los roles
---
--- LOS TRES QUE IMPORTAN PARA PROBAR EL CONTROL DE ACCESO:
---
---   admin@correo.com       Administrador: entra a las 15 rutas
---   vendedor1@correo.com   Vendedor + Cajero: SOLO /home, /factura y /cliente
---   cliente1@correo.com    Cliente: SOLO /home y /producto
---
--- Con esos tres se comprueba el 403: entrar como vendedor1 y pedir
--- /api/usuario tiene que responder 403, no 401. Y NO porque la interfaz
--- esconda el boton: escribiendo la direccion a mano.
---
--- NOTA DE HISTORIA, porque explica un comentario del repositorio: hasta
--- octubre de 2026 dos de estas filas tenian la contrasena en TEXTO PLANO.
--- `password_verify` devuelve false ante un hash malformado —sin lanzar nada—,
--- asi que la API respondia «no coincide» en vez de caerse. Ese comportamiento
--- se queda: un dato malo en la base de datos no puede tumbar la API.
--- ============================================================
-INSERT INTO usuario (email, contrasena) VALUES
-('admin@correo.com', '$2y$12$SUA9ETzVfL0T/uPDa73fw.muFMdy46LW12pHgMh1tB6V0eEO4foZ2'),
-('vendedor1@correo.com', '$2y$12$CYVZtYBHcdzV0j9tYU91xusvpB4pZ14ocGTHrAgyaAYXWj27n5j5C'),
-('jefe@correo.com', '$2y$12$33qnFFMZ..gpBa3L/kXCUupHCcMrfGTUchWzQjjCw5TBoSIgTOcjm'),
-('cliente1@correo.com', '$2y$12$TscX3iQauO9ZWHDxd3mxe.nlqhgko9Lih/NFr3eA7zTgugvRhjrau'),
-('test_encript@correo.com', '$2y$12$PvxiFmk0md3gwzWPSvNm2eyf7JZiGmSLzkaHVXh9X6ZhS58U7tGy2'),
-('nuevo@correo.com', '$2y$12$7eGiaRC22NMoWTI/.K4ui.LUdnGc8ryifwrWFP8nHN17vDd/7C.TS'),
-('carlos.castro@usbmed.edu.co', '$2y$12$lxMKrp7G9pYIFKGCFakWPucJDlyjSTlP1v2MoCxub6d/.szFk.Pcq'),
-('carloscastro5033@correo.itm.edu.co', '$2y$12$h7EG/WmRZQYBINNP6jx.vuk2jwJT7xuZWWim5ZG709cJQ1dzeCZOS');
+    INSERT INTO usuario (email, contrasena) VALUES (p_email, p_contrasena);
 
     -- Insertar los roles del usuario
     SET v_count = JSON_LENGTH(p_roles_json);
@@ -806,6 +880,8 @@ INSERT INTO usuario (email, contrasena) VALUES
     WHERE ru.fkemail = p_email;
 
     SET p_resultado = CONCAT('{"email":"', p_email, '","roles":', COALESCE(v_roles_json, '[]'), '}');
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -836,6 +912,31 @@ BEGIN
     DECLARE v_idrol INT;
     DECLARE v_roles_json TEXT;
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     -- Actualizar la contraseña solo si no está vacía
     IF p_contrasena IS NOT NULL AND p_contrasena != '' THEN
         UPDATE usuario SET contrasena = p_contrasena WHERE email = p_email;
@@ -863,6 +964,8 @@ BEGIN
     WHERE ru.fkemail = p_email;
 
     SET p_resultado = CONCAT('{"email":"', p_email, '","roles":', COALESCE(v_roles_json, '[]'), '}');
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -886,6 +989,31 @@ CREATE PROCEDURE eliminar_usuario_con_roles(
 BEGIN
     DECLARE v_msg VARCHAR(500);
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     IF NOT EXISTS (SELECT 1 FROM usuario WHERE email = p_email) THEN
         SET v_msg = CONCAT('Usuario ', p_email, ' no existe');
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
@@ -899,6 +1027,8 @@ BEGIN
         'mensaje', 'Usuario eliminado exitosamente',
         'email_eliminado', p_email
     );
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -929,6 +1059,31 @@ BEGIN
     DECLARE v_roles_json_result TEXT;
     DECLARE v_msg VARCHAR(500);
 
+    -- ------------------------------------------------------------------
+    -- LA TRANSACCION, y por que esta escrita A MANO solo en MariaDB
+    --
+    -- En MariaDB cada sentencia se confirma sola (`autocommit`), asi que un
+    -- procedimiento que escribe en dos tablas puede quedarse A MEDIAS: se
+    -- midio: un PATCH con un rol inexistente borraba los roles del usuario
+    -- —el DELETE— y fallaba al insertar los nuevos. El usuario se quedaba
+    -- sin un solo rol por una peticion que respondio 409.
+    --
+    -- SQL Server trae su `BEGIN TRY` + `ROLLBACK`, y en PostgreSQL una
+    -- FUNCION es atomica sin que uno escriba nada. **El mismo sistema, tres
+    -- motores, y solo este necesita las tres lineas.**
+    --
+    -- `RESIGNAL` vuelve a lanzar el error ORIGINAL con su codigo intacto
+    -- —1452, 1062—, que es lo que el repositorio traduce a 409. Sin el, el
+    -- ROLLBACK salvaria los datos y la API respondaria 500.
+    -- ------------------------------------------------------------------
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
     IF NOT EXISTS (SELECT 1 FROM usuario WHERE email = p_email) THEN
         SET v_msg = CONCAT('Usuario ', p_email, ' no existe');
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
@@ -956,6 +1111,8 @@ BEGIN
     WHERE ru.fkemail = p_email;
 
     SET p_resultado = CONCAT('{"email":"', p_email, '","roles":', COALESCE(v_roles_json_result, '[]'), '}');
+
+    COMMIT;
 END$$
 
 -- ------------------------------------------------------------
@@ -1228,16 +1385,66 @@ INSERT INTO ruta (ruta, descripcion) VALUES
 ('/ruta/crear', 'Crear ruta (POST)'),
 ('/ruta/eliminar', 'Eliminar ruta (POST)');
 
--- Usuarios (con hashes BCrypt identicos a SQL Server/PostgreSQL)
+-- ============================================================
+-- USUARIOS: LAS CONTRASENAS CON HASH, Y SE SABEN CUALES SON
+--
+-- Dos reglas, y la segunda es la que suele faltar:
+--
+--   1. NINGUNA fila guarda texto legible. La columna es VARCHAR(200) —y no
+--      20— precisamente porque un hash de bcrypt ocupa 60 caracteres.
+--
+--   2. Las contrasenas en claro estan ESCRITAS EN LA DOCUMENTACION, porque
+--      del hash no se puede volver a la clave —eso es lo que lo hace un
+--      hash—. Sin saberlas no hay forma de iniciar sesion, y sin iniciar
+--      sesion no se comprueba un solo criterio del control de acceso.
+--
+-- EL HASH ES BCRYPT COSTO 12, hecho con `password_hash()` de PHP. El
+-- `$2y$12$` del principio lo dice: `2y` es la variante que usa PHP y `12` el
+-- costo. Cada punto de costo DUPLICA el tiempo de calculo — y es para lo que
+-- se diseno bcrypt: encarecerlo cuando las maquinas sean mas rapidas, sin
+-- cambiar de funcion.
+--
+-- Y CADA HASH ES DISTINTO AUNQUE LA CLAVE SEA LA MISMA. Los dos usuarios de
+-- carlos.castro comparten contrasena y sus hash no se parecen: bcrypt trae
+-- SALT incorporado. Sin el, dos hash iguales delatarian que esas dos
+-- personas usan la misma clave.
+--
+-- Las contrasenas en claro, para las pruebas:
+--
+--   admin@correo.com                      admin123       Administrador
+--   vendedor1@correo.com                  vendedor123    Vendedor + Cajero
+--   jefe@correo.com                       jefe123        Administrador + Cajero + Contador
+--   cliente1@correo.com                   cliente123     Cliente
+--   test_encript@correo.com               test123        Administrador
+--   nuevo@correo.com                      nuevo123       Administrador + Vendedor + Cajero
+--   carlos.castro@usbmed.edu.co           carlos123      todos los roles
+--   carloscastro5033@correo.itm.edu.co    carlos123      todos los roles
+--
+-- LOS TRES QUE IMPORTAN PARA PROBAR EL CONTROL DE ACCESO:
+--
+--   admin@correo.com       Administrador: entra a las 15 rutas
+--   vendedor1@correo.com   Vendedor + Cajero: SOLO /home, /factura y /cliente
+--   cliente1@correo.com    Cliente: SOLO /home y /producto
+--
+-- Con esos tres se comprueba el 403: entrar como vendedor1 y pedir
+-- /api/usuario tiene que responder 403, no 401. Y NO porque la interfaz
+-- esconda el boton: escribiendo la direccion a mano.
+--
+-- NOTA DE HISTORIA, porque explica un comentario del repositorio: hasta
+-- octubre de 2026 dos de estas filas tenian la contrasena en TEXTO PLANO.
+-- `password_verify` devuelve false ante un hash malformado —sin lanzar nada—,
+-- asi que la API respondia «no coincide» en vez de caerse. Ese comportamiento
+-- se queda: un dato malo en la base de datos no puede tumbar la API.
+-- ============================================================
 INSERT INTO usuario (email, contrasena) VALUES
-('admin@correo.com', '$2a$12$3UgI.Eof.FhzsYUWESI9n.qFaqkV2JPhvW3L/1GTKowNJnGaD8F.G'),
-('vendedor1@correo.com', '$2a$12$Dgog4VaHqMzhliPVJy1BcOMd6.izEGNeRDtZ.O7SPmBLc6UVthVTG'),
-('jefe@correo.com', 'jefe123'),
-('cliente1@correo.com', 'cli123'),
-('test_encript@correo.com', '$2a$11$Ci0J2yBltDgQHfjadgkl0OtbcF5pUf97vTq/4Xr0KEU/86l8ybjBe'),
-('nuevo@correo.com', '$2a$11$cmtGBxllwc7MCzpnKVSWuumiOgCaG6PaKWcN1z9N0bjjnkobbFDzO'),
-('carlos.castro@usbmed.edu.co', '$2a$10$YYl6bHCflCnk8suUrms3ie.rnpLvfD9nHJtehZwhcSkINelGwt6iC'),
-('carloscastro5033@correo.itm.edu.co', '$2a$10$YYl6bHCflCnk8suUrms3ie.rnpLvfD9nHJtehZwhcSkINelGwt6iC');
+('admin@correo.com', '$2y$12$SUA9ETzVfL0T/uPDa73fw.muFMdy46LW12pHgMh1tB6V0eEO4foZ2'),
+('vendedor1@correo.com', '$2y$12$CYVZtYBHcdzV0j9tYU91xusvpB4pZ14ocGTHrAgyaAYXWj27n5j5C'),
+('jefe@correo.com', '$2y$12$33qnFFMZ..gpBa3L/kXCUupHCcMrfGTUchWzQjjCw5TBoSIgTOcjm'),
+('cliente1@correo.com', '$2y$12$TscX3iQauO9ZWHDxd3mxe.nlqhgko9Lih/NFr3eA7zTgugvRhjrau'),
+('test_encript@correo.com', '$2y$12$PvxiFmk0md3gwzWPSvNm2eyf7JZiGmSLzkaHVXh9X6ZhS58U7tGy2'),
+('nuevo@correo.com', '$2y$12$7eGiaRC22NMoWTI/.K4ui.LUdnGc8ryifwrWFP8nHN17vDd/7C.TS'),
+('carlos.castro@usbmed.edu.co', '$2y$12$lxMKrp7G9pYIFKGCFakWPucJDlyjSTlP1v2MoCxub6d/.szFk.Pcq'),
+('carloscastro5033@correo.itm.edu.co', '$2y$12$h7EG/WmRZQYBINNP6jx.vuk2jwJT7xuZWWim5ZG709cJQ1dzeCZOS');
 
 -- Clientes (con IDs explícitos, incluyendo id=5 saltando id=4)
 INSERT INTO cliente (id, credito, fkcodpersona, fkcodempresa) VALUES

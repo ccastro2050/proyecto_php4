@@ -58,6 +58,7 @@ require_once __DIR__ . '/ServicioRuta.php';
 require_once __DIR__ . '/ServicioUsuario.php';
 require_once __DIR__ . '/ServicioRolUsuario.php';
 require_once __DIR__ . '/ServicioSesion.php';
+require_once __DIR__ . '/ServicioUsuarioConRoles.php';
 require_once __DIR__ . '/ServicioRutaRol.php';
 require_once __DIR__ . '/ServicioRol.php';
 
@@ -72,6 +73,7 @@ require_once __DIR__ . '/../repositorios/RepositorioRutaMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioAccesoMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioConRolesMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolMariaDB.php';
 
@@ -86,6 +88,7 @@ require_once __DIR__ . '/../repositorios/RepositorioRutaPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioAccesoPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioConRolesPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolPostgres.php';
 
@@ -100,6 +103,7 @@ require_once __DIR__ . '/../repositorios/RepositorioRutaSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioAccesoSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioConRolesSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolSqlServer.php';
 
@@ -358,4 +362,17 @@ function crearServicioSesion(): IServicioSesion
     };
 
     return new ServicioSesion($usuarios, $puente, crearRepositorioAcceso());
+}
+
+function crearServicioUsuarioConRoles(): IServicioUsuarioConRoles
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioUsuarioConRolesPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioUsuarioConRolesSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioUsuarioConRolesMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioUsuarioConRoles($repositorio);
 }

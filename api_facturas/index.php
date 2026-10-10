@@ -52,6 +52,7 @@ require_once __DIR__ . '/controladores/ControladorUsuario.php';
 require_once __DIR__ . '/controladores/ControladorRutaRol.php';
 require_once __DIR__ . '/controladores/ControladorRolUsuario.php';
 require_once __DIR__ . '/controladores/ControladorSesion.php';
+require_once __DIR__ . '/controladores/ControladorUsuarioConRoles.php';
 require_once __DIR__ . '/autorizacion/guardia.php';
 require_once __DIR__ . '/controladores/ControladorRol.php';
 
@@ -91,7 +92,7 @@ if ($ruta === '/' && $metodo === 'GET') {
             '/api/cliente', '/api/vendedor', '/api/factura',
             '/api/ruta', '/api/usuario',
             '/api/rol-usuario',
-            '/api/rutarol',
+            '/api/rutarol', '/api/usuario-con-roles',
             '/api/rol',
         ],
         'sesion'    => 'POST /api/sesion para entrar; todo lo demas exige '
@@ -150,6 +151,7 @@ const PERMISO_POR_RECURSO = [
     'ruta'        => '/ruta',
     'usuario'     => '/usuario',
     'rol-usuario' => '/usuario',
+    'usuario-con-roles' => '/usuario',
     'rutarol'     => '/permiso',
 ];
 
@@ -660,6 +662,47 @@ if (preg_match('#^/api/rol-usuario/([^/]+)/([^/]+)$#', $ruta, $partes)) {
 
     if ($metodo === 'DELETE') {
         $controlador->eliminar($a, $b);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// USUARIO-CON-ROLES — no es una tabla: es una OPERACION
+// ======================================================================
+//
+// Toca `usuario` y `rol_usuario`, y las dos cosas tienen que valer como una:
+// crear el usuario y dejarlo sin roles seria crear a alguien que no puede
+// hacer nada. De ahi que lo resuelvan procedimientos almacenados — la
+// transaccion esta donde estan los datos.
+//
+// Y de ahi que este recurso exista ADEMAS de /api/usuario y /api/rol-usuario:
+// es la misma relacion vista como un documento en vez de pareja por pareja.
+if ($ruta === '/api/usuario-con-roles') {
+    $controlador = new ControladorUsuarioConRoles(crearServicioUsuarioConRoles());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/usuario-con-roles/')) {
+    $controlador = new ControladorUsuarioConRoles(crearServicioUsuarioConRoles());
+    $email = urldecode(substr($ruta, strlen('/api/usuario-con-roles/')));
+
+    if ($metodo === 'GET') {
+        $controlador->consultar($email);
+    } elseif ($metodo === 'PUT') {
+        $controlador->reemplazar($email, $body);
+    } elseif ($metodo === 'PATCH') {
+        $controlador->actualizar($email, $body);
+    } elseif ($metodo === 'DELETE') {
+        $controlador->eliminar($email);
     } else {
         responderNoPermitido();
     }
