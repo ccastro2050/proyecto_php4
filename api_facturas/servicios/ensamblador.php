@@ -55,6 +55,9 @@ require_once __DIR__ . '/ServicioCliente.php';
 require_once __DIR__ . '/ServicioVendedor.php';
 require_once __DIR__ . '/ServicioFactura.php';
 require_once __DIR__ . '/ServicioRuta.php';
+require_once __DIR__ . '/ServicioUsuario.php';
+require_once __DIR__ . '/ServicioRolUsuario.php';
+require_once __DIR__ . '/ServicioRutaRol.php';
 require_once __DIR__ . '/ServicioRol.php';
 
 // --- MariaDB ---
@@ -65,6 +68,9 @@ require_once __DIR__ . '/../repositorios/RepositorioClienteMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaRolMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolMariaDB.php';
 
 // --- PostgreSQL ---
@@ -75,6 +81,9 @@ require_once __DIR__ . '/../repositorios/RepositorioClientePostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaRolPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolPostgres.php';
 
 // --- SQL Server ---
@@ -85,6 +94,9 @@ require_once __DIR__ . '/../repositorios/RepositorioClienteSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioUsuarioSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolUsuarioSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaRolSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolSqlServer.php';
 
 /**
@@ -256,4 +268,43 @@ function crearServicioRuta(): IServicioRuta
     };
 
     return new ServicioRuta($repositorio);
+}
+
+function crearServicioUsuario(): IServicioUsuario
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioUsuarioPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioUsuarioSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioUsuarioMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioUsuario($repositorio);
+}
+
+function crearServicioRutaRol(): IServicioRutaRol
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioRutaRolPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioRutaRolSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioRutaRolMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioRutaRol($repositorio);
+}
+
+function crearServicioRolUsuario(): IServicioRolUsuario
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioRolUsuarioPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioRolUsuarioSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioRolUsuarioMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioRolUsuario($repositorio);
 }

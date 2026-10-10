@@ -48,6 +48,9 @@ require_once __DIR__ . '/controladores/ControladorCliente.php';
 require_once __DIR__ . '/controladores/ControladorVendedor.php';
 require_once __DIR__ . '/controladores/ControladorFactura.php';
 require_once __DIR__ . '/controladores/ControladorRuta.php';
+require_once __DIR__ . '/controladores/ControladorUsuario.php';
+require_once __DIR__ . '/controladores/ControladorRutaRol.php';
+require_once __DIR__ . '/controladores/ControladorRolUsuario.php';
 require_once __DIR__ . '/controladores/ControladorRol.php';
 
 // Toda respuesta de esta API es JSON — se avisa en el encabezado HTTP:
@@ -84,7 +87,9 @@ if ($ruta === '/' && $metodo === 'GET') {
         'recursos'  => [
             '/api/producto', '/api/empresa', '/api/persona',
             '/api/cliente', '/api/vendedor', '/api/factura',
-            '/api/ruta',
+            '/api/ruta', '/api/usuario',
+            '/api/rol-usuario',
+            '/api/rutarol',
             '/api/rol',
         ],
         'contratos' => 'docs/spec_kit/versiones/v4_sqlserver/6_contracts.md',
@@ -327,6 +332,215 @@ if (str_starts_with($ruta, '/api/ruta/')) {
         $controlador->actualizar($llave, $body);
     } elseif ($metodo === 'DELETE') {
         $controlador->eliminar($llave);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// USUARIO — la llave es el EMAIL, un texto que el cliente conoce
+// ======================================================================
+//
+// OJO AL ORDEN DE ESTOS TRES BLOQUES, porque es el tropiezo del recurso: el
+// enrutador compara de arriba abajo, y `str_starts_with('/api/usuario/')`
+// tambien casa con `/api/usuario/verificar-contrasena`. Si el bloque de la
+// llave fuera primero, esa peticion acabaria buscando un usuario llamado
+// «verificar-contrasena» y devolveria 404 — un 404 que cuesta encontrar,
+// porque el endpoint existe.
+//
+// LA RUTA FIJA VA ANTES QUE LA RUTA CON PARAMETRO. Siempre.
+if ($ruta === '/api/usuario/verificar-contrasena') {
+    $controlador = new ControladorUsuario(crearServicioUsuario());
+    if ($metodo === 'POST') {
+        // Las credenciales van EN EL CUERPO, no en la URL: una contrasena en
+        // la URL queda en el historial del navegador y en los registros de
+        // cualquier proxy del camino.
+        $controlador->verificarContrasena($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if ($ruta === '/api/usuario') {
+    $controlador = new ControladorUsuario(crearServicioUsuario());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/usuario/')) {
+    $controlador = new ControladorUsuario(crearServicioUsuario());
+    // urldecode porque el email viaja con @ y puntos: el navegador los
+    // escapa y aqui se devuelven a su forma.
+    $email = urldecode(substr($ruta, strlen('/api/usuario/')));
+
+    if ($metodo === 'GET') {
+        $controlador->obtener($email);
+    } elseif ($metodo === 'PUT') {
+        $controlador->reemplazar($email, $body);
+    } elseif ($metodo === 'PATCH') {
+        $controlador->actualizar($email, $body);
+    } elseif ($metodo === 'DELETE') {
+        $controlador->eliminar($email);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// RUTAROL — tabla PUENTE: CINCO endpoints, y no son los cinco verbos
+// ======================================================================
+//
+// Las dos columnas SON la llave, asi que una pareja existe o no existe. De
+// ahi que no haya PUT ni PATCH: lo que seria «actualizar» es MOVER la fila
+// —borrar una pareja e insertar otra—, y eso ya se hace con el DELETE y el
+// POST de abajo.
+//
+// LOS DOS VERBOS APAGADOS, escritos para que se vea COMO serian:
+//
+//   } elseif ($metodo === 'PUT') {
+//       // Mover la pareja: recibiria la nueva ENTERA en el body, borraria
+//       // la vieja e insertaria la nueva — en UNA transaccion, porque si
+//       // el INSERT falla el DELETE no puede quedarse hecho.
+//       $controlador->reemplazar($a, $b, $body);
+//   } elseif ($metodo === 'PATCH') {
+//       // Mover UN lado y conservar el otro: {"fkidrol": 3} le pasaria
+//       // esta fila a otro rol.
+//       $controlador->actualizar($a, $b, $body);
+//
+// Estan apagados porque el contrato declara cinco endpoints y estos no son
+// dos de ellos. Se dejan escritos porque hay dos cosas que aprender: como se
+// programa el verbo, y que una API NO lleva todos los verbos en todos los
+// recursos.
+if ($ruta === '/api/rutarol') {
+    $controlador = new ControladorRutaRol(crearServicioRutaRol());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// Las DOS busquedas por lado. Van ANTES del bloque de la pareja porque
+// `/api/rutarol/ruta/...` tambien casaria con el patron de dos
+// segmentos, y el enrutador compara por orden.
+if (str_starts_with($ruta, '/api/rutarol/ruta/')) {
+    $controlador = new ControladorRutaRol(crearServicioRutaRol());
+    $lado = (int) urldecode(substr($ruta, strlen('/api/rutarol/ruta/')));
+    if ($metodo === 'GET') {
+        $controlador->listarPorLadoA($lado);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/rutarol/rol/')) {
+    $controlador = new ControladorRutaRol(crearServicioRutaRol());
+    $lado = (int) urldecode(substr($ruta, strlen('/api/rutarol/rol/')));
+    if ($metodo === 'GET') {
+        $controlador->listarPorLadoB($lado);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// La pareja: DOS segmentos, y los dos hacen falta para identificarla.
+if (preg_match('#^/api/rutarol/([^/]+)/([^/]+)$#', $ruta, $partes)) {
+    $controlador = new ControladorRutaRol(crearServicioRutaRol());
+    $a = (int) urldecode($partes[1]);
+    $b = (int) urldecode($partes[2]);
+
+    if ($metodo === 'DELETE') {
+        $controlador->eliminar($a, $b);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// ROL_USUARIO — tabla PUENTE: CINCO endpoints, y no son los cinco verbos
+// ======================================================================
+//
+// Las dos columnas SON la llave, asi que una pareja existe o no existe. De
+// ahi que no haya PUT ni PATCH: lo que seria «actualizar» es MOVER la fila
+// —borrar una pareja e insertar otra—, y eso ya se hace con el DELETE y el
+// POST de abajo.
+//
+// LOS DOS VERBOS APAGADOS, escritos para que se vea COMO serian:
+//
+//   } elseif ($metodo === 'PUT') {
+//       // Mover la pareja: recibiria la nueva ENTERA en el body, borraria
+//       // la vieja e insertaria la nueva — en UNA transaccion, porque si
+//       // el INSERT falla el DELETE no puede quedarse hecho.
+//       $controlador->reemplazar($a, $b, $body);
+//   } elseif ($metodo === 'PATCH') {
+//       // Mover UN lado y conservar el otro: {"fkidrol": 3} le pasaria
+//       // esta fila a otro rol.
+//       $controlador->actualizar($a, $b, $body);
+//
+// Estan apagados porque el contrato declara cinco endpoints y estos no son
+// dos de ellos. Se dejan escritos porque hay dos cosas que aprender: como se
+// programa el verbo, y que una API NO lleva todos los verbos en todos los
+// recursos.
+if ($ruta === '/api/rol-usuario') {
+    $controlador = new ControladorRolUsuario(crearServicioRolUsuario());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// Las DOS busquedas por lado. Van ANTES del bloque de la pareja porque
+// `/api/rol-usuario/usuario/...` tambien casaria con el patron de dos
+// segmentos, y el enrutador compara por orden.
+if (str_starts_with($ruta, '/api/rol-usuario/usuario/')) {
+    $controlador = new ControladorRolUsuario(crearServicioRolUsuario());
+    $lado = urldecode(substr($ruta, strlen('/api/rol-usuario/usuario/')));
+    if ($metodo === 'GET') {
+        $controlador->listarPorLadoA($lado);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/rol-usuario/rol/')) {
+    $controlador = new ControladorRolUsuario(crearServicioRolUsuario());
+    $lado = (int) urldecode(substr($ruta, strlen('/api/rol-usuario/rol/')));
+    if ($metodo === 'GET') {
+        $controlador->listarPorLadoB($lado);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// La pareja: DOS segmentos, y los dos hacen falta para identificarla.
+if (preg_match('#^/api/rol-usuario/([^/]+)/([^/]+)$#', $ruta, $partes)) {
+    $controlador = new ControladorRolUsuario(crearServicioRolUsuario());
+    $a = urldecode($partes[1]);
+    $b = (int) urldecode($partes[2]);
+
+    if ($metodo === 'DELETE') {
+        $controlador->eliminar($a, $b);
     } else {
         responderNoPermitido();
     }
