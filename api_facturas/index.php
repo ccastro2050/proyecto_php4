@@ -53,6 +53,7 @@ require_once __DIR__ . '/controladores/ControladorRutaRol.php';
 require_once __DIR__ . '/controladores/ControladorRolUsuario.php';
 require_once __DIR__ . '/controladores/ControladorSesion.php';
 require_once __DIR__ . '/controladores/ControladorUsuarioConRoles.php';
+require_once __DIR__ . '/controladores/ControladorConsultas.php';
 require_once __DIR__ . '/autorizacion/guardia.php';
 require_once __DIR__ . '/controladores/ControladorRol.php';
 
@@ -153,6 +154,11 @@ const PERMISO_POR_RECURSO = [
     'rol-usuario' => '/usuario',
     'usuario-con-roles' => '/usuario',
     'rutarol'     => '/permiso',
+    // Las diez consultas de la v4 piden `/home`, que es el permiso de entrar
+    // al aplicativo: el tablero es la pagina de inicio y hoy lo ven los cinco
+    // roles. Si manana un reporte fuera reservado —las ventas por vendedor,
+    // por ejemplo— se le pone SU permiso a esa ruta sola, no al grupo.
+    'consultas'   => '/home',
 ];
 
 // ----------------------------------------------------------------------
@@ -759,6 +765,84 @@ if (str_starts_with($ruta, '/api/factura/')) {
     } else {
         // PATCH cae aquí y responde 405. No es un descuido: es el
         // enrutador diciendo que ese verbo no aplica a este recurso.
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// LAS DIEZ CONSULTAS DE LA v4  —  /api/consultas/...
+// ======================================================================
+//
+// UN MAPA, NO DIEZ `if`. El enrutador ya tiene un bloque por recurso; diez
+// bloques mas, todos iguales salvo el nombre, lo volverian ilegible sin
+// ensenar nada. El mapa dice lo mismo en diez lineas, y el `if` se reserva
+// para lo que si cambia: el VERBO.
+//
+// La guardia ya corrio mucho mas arriba —`consultas` esta en el mapa de
+// permisos y exige `/home`—, asi que si la ejecucion llego hasta aqui es
+// porque quien pregunta tiene sesion y permiso.
+if (str_starts_with($ruta, '/api/consultas/')) {
+    /** Cada ruta publica, con el metodo del controlador que la atiende. */
+    $CONSULTAS = [
+        'ventas-por-producto'     => 'ventasPorProducto',
+        'ventas-por-cliente'      => 'ventasPorCliente',
+        'ventas-por-vendedor'     => 'ventasPorVendedor',
+        'ventas-por-empresa'      => 'ventasPorEmpresa',
+        'ticket-por-vendedor'     => 'ticketPorVendedor',
+        'productos-sin-vender'    => 'productosSinVender',
+        'anulaciones-por-cliente' => 'anulacionesPorCliente',
+        'alcance-de-usuarios'     => 'alcanceDeUsuarios',
+        'interfaces-sin-usuarios' => 'interfacesSinUsuarios',
+        'credito-contra-consumo'  => 'creditoContraConsumo',
+    ];
+
+    $nombre = substr($ruta, strlen('/api/consultas/'));
+
+    if (isset($CONSULTAS[$nombre])) {
+        if ($metodo === 'GET') {
+            // `$objeto->$metodo()` llama al metodo cuyo nombre esta en la
+            // variable. Y se puede hacer PORQUE el nombre sale del mapa de
+            // arriba y no de la URL: si saliera de la URL, cualquiera podria
+            // pedir que se ejecutara cualquier metodo del controlador.
+            $controlador = new ControladorConsultas(crearServicioConsultas());
+            $accion = $CONSULTAS[$nombre];
+            $controlador->$accion();
+        } else {
+            // POST, PUT, PATCH o DELETE sobre un reporte: 405. Una consulta
+            // no tiene nada que crear ni que borrar.
+            responderNoPermitido();
+        }
+        return;
+    }
+    // Un nombre que no esta en el mapa cae al 404 de ruta, mas abajo.
+}
+
+// ----------------------------------------------------------------------
+// GET /api/consultas  —  el indice de las diez, para el front
+// ----------------------------------------------------------------------
+// Sin esto, el menu del tablero tendria las diez rutas escritas a mano en el
+// front: dos listas que hay que acordarse de cambiar a la vez.
+if ($ruta === '/api/consultas') {
+    if ($metodo === 'GET') {
+        http_response_code(200);
+        echo json_encode([
+            'tabla' => 'consultas',
+            'total' => 10,
+            'datos' => [
+                ['nombre' => 'ventas-por-producto',     'titulo' => 'Ventas por producto'],
+                ['nombre' => 'ventas-por-cliente',      'titulo' => 'Ventas por cliente'],
+                ['nombre' => 'ventas-por-vendedor',     'titulo' => 'Ventas por vendedor'],
+                ['nombre' => 'ventas-por-empresa',      'titulo' => 'Ventas por empresa'],
+                ['nombre' => 'ticket-por-vendedor',     'titulo' => 'Ticket promedio por vendedor'],
+                ['nombre' => 'productos-sin-vender',    'titulo' => 'Productos sin vender'],
+                ['nombre' => 'anulaciones-por-cliente', 'titulo' => 'Anulaciones por cliente'],
+                ['nombre' => 'alcance-de-usuarios',     'titulo' => 'Alcance de usuarios'],
+                ['nombre' => 'interfaces-sin-usuarios', 'titulo' => 'Interfaces sin usuarios'],
+                ['nombre' => 'credito-contra-consumo',  'titulo' => 'Credito contra consumo'],
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+    } else {
         responderNoPermitido();
     }
     return;

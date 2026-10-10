@@ -59,6 +59,7 @@ require_once __DIR__ . '/ServicioUsuario.php';
 require_once __DIR__ . '/ServicioRolUsuario.php';
 require_once __DIR__ . '/ServicioSesion.php';
 require_once __DIR__ . '/ServicioUsuarioConRoles.php';
+require_once __DIR__ . '/ServicioConsultas.php';
 require_once __DIR__ . '/ServicioRutaRol.php';
 require_once __DIR__ . '/ServicioRol.php';
 
@@ -106,6 +107,9 @@ require_once __DIR__ . '/../repositorios/RepositorioAccesoSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioUsuarioConRolesSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRutaRolSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioRolSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioConsultasMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioConsultasPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioConsultasSqlServer.php';
 
 /**
  * Qué motor está activo: `'mariadb'`, `'postgres'` o `'sqlserver'`.
@@ -375,4 +379,26 @@ function crearServicioUsuarioConRoles(): IServicioUsuarioConRoles
     };
 
     return new ServicioUsuarioConRoles($repositorio);
+}
+
+/**
+ * El servicio de las diez consultas de la v4.
+ *
+ * Identico en forma a los otros nueve, y eso es lo que tiene de bueno: la
+ * pieza nueva de esta version entra por la misma puerta. Dos de las diez
+ * consultas estan escritas distinto en cada motor —GROUP_CONCAT contra
+ * STRING_AGG, y el CAST del ticket en T-SQL—, y de eso NO se entera nadie
+ * fuera del repositorio que toque este `match`.
+ */
+function crearServicioConsultas(): IServicioConsultas
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioConsultasPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioConsultasSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioConsultasMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioConsultas($repositorio);
 }

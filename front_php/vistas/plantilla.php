@@ -35,42 +35,160 @@
         </span>
       </a>
 
-      <?php /* La clase `active` marca dónde está parado el usuario. Sale de
-               $ruta, que es la dirección de verdad — no de una variable que
-               alguien tenga que acordarse de cambiar. */ ?>
-      <?php /* El menú de la v2. Seis entradas escritas una por una: cuando
-               llegue una tabla nueva se agrega AQUÍ y aparece en todas las
-               pantallas. La clase `active` sale de $ruta, que es la
-               dirección de verdad — no de una variable que alguien tenga que
-               acordarse de cambiar. */ ?>
+      <?php /* ==============================================================
+           EL MENU DE LA v4, Y COMO SE DECIDE CADA ENTRADA
+
+           Cada entrada se pinta SI la API dijo que esta persona alcanza esa
+           ruta. La lista viene de `GET /api/permisos/mios` y se guardo en la
+           sesion al entrar; aqui solo se consulta con `puede()`.
+
+           **ESCONDER UN ENLACE NO ES CONTROL DE ACCESO.** Esto es comodidad:
+           no ofrecer un boton que va a responder 403. Quien escriba la
+           direccion a mano llega igual al enrutador, y la API le contesta
+           403 porque consulta `verificar_acceso_ruta` en la base de datos en
+           CADA peticion. Las dos cosas son necesarias y hacen cosas
+           distintas: una cuida la experiencia, la otra cuida los datos.
+
+           Y el nombre del permiso es el de la tabla `ruta`, letra por letra
+           —`/producto`, no `/productos`—: el plural es la direccion de la
+           PANTALLA, el singular es el nombre del PERMISO. Confundirlos deja
+           el menu vacio y cuesta un rato encontrarlo.
+
+           La clase `active` sale de $ruta, que es la direccion de verdad, no
+           de una variable que alguien tenga que acordarse de cambiar.
+           ============================================================== */ ?>
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item">
-          <a class="nav-link <?= $ruta === '/' ? 'active' : '' ?>" href="/">Inicio</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/facturas') ? 'active' : '' ?>"
-             href="/facturas">Facturas</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/productos') ? 'active' : '' ?>"
-             href="/productos">Productos</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/clientes') ? 'active' : '' ?>"
-             href="/clientes">Clientes</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/vendedores') ? 'active' : '' ?>"
-             href="/vendedores">Vendedores</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/personas') ? 'active' : '' ?>"
-             href="/personas">Personas</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= str_starts_with($ruta, '/empresas') ? 'active' : '' ?>"
-             href="/empresas">Empresas</a>
-        </li>
+        <?php if (!empty($sesion['email'])): ?>
+
+          <li class="nav-item">
+            <a class="nav-link <?= $ruta === '/' ? 'active' : '' ?>" href="/">Inicio</a>
+          </li>
+
+          <?php if (puede('/home')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/tablero') ? 'active' : '' ?>"
+                 href="/tablero">Tablero</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/factura')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/facturas') ? 'active' : '' ?>"
+                 href="/facturas">Facturas</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/producto')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/productos') ? 'active' : '' ?>"
+                 href="/productos">Productos</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/cliente')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/clientes') ? 'active' : '' ?>"
+                 href="/clientes">Clientes</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/vendedor')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/vendedores') ? 'active' : '' ?>"
+                 href="/vendedores">Vendedores</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/persona')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/personas') ? 'active' : '' ?>"
+                 href="/personas">Personas</a>
+            </li>
+          <?php endif; ?>
+
+          <?php if (puede('/empresa')): ?>
+            <li class="nav-item">
+              <a class="nav-link <?= str_starts_with($ruta, '/empresas') ? 'active' : '' ?>"
+                 href="/empresas">Empresas</a>
+            </li>
+          <?php endif; ?>
+
+          <?php /* ----------------------------------------------------------
+               LA ADMINISTRACION, EN UN MENU APARTE
+
+               Cinco pantallas que casi nadie ve —solo el Administrador tiene
+               `/usuario`, `/rol`, `/ruta` y `/permiso`— y que no tienen por
+               que ocupar la barra de todos. Se agrupan en un desplegable, y
+               el desplegable entero desaparece si no se alcanza ninguna.
+               ---------------------------------------------------------- */ ?>
+          <?php $admin = puede('/usuario') || puede('/rol') || puede('/ruta') || puede('/permiso'); ?>
+          <?php if ($admin): ?>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle <?= preg_match('#^/(usuarios|roles|rutas|permisos)#', $ruta) ? 'active' : '' ?>"
+                 href="#" role="button" data-bs-toggle="dropdown">Administrar</a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <?php if (puede('/usuario')): ?>
+                  <li><a class="dropdown-item" href="/usuarios">Usuarios</a></li>
+                  <li><a class="dropdown-item" href="/usuarios-con-roles">Usuarios con sus roles</a></li>
+                  <li><a class="dropdown-item" href="/usuarios-roles">Asignar roles</a></li>
+                <?php endif; ?>
+                <?php if (puede('/rol')): ?>
+                  <li><a class="dropdown-item" href="/roles">Roles</a></li>
+                <?php endif; ?>
+                <?php if (puede('/ruta')): ?>
+                  <li><a class="dropdown-item" href="/rutas">Rutas</a></li>
+                <?php endif; ?>
+                <?php if (puede('/permiso')): ?>
+                  <li><a class="dropdown-item" href="/permisos">Permisos por rol</a></li>
+                <?php endif; ?>
+              </ul>
+            </li>
+          <?php endif; ?>
+
+          <?php /* ----------------------------------------------------------
+               QUIEN ESTA DENTRO, Y LA SALIDA
+
+               El correo y los roles a la vista: sin eso, dos pestanas con dos
+               cuentas distintas son indistinguibles —y es exactamente lo que
+               uno hace para probar el 403—.
+
+               Y salir es un BOTON dentro de un formulario, no un enlace: un
+               GET que cierra la sesion lo dispara cualquier cosa que cargue
+               una direccion, desde una imagen hasta el prefetch del
+               navegador.
+               ---------------------------------------------------------- */ ?>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+              <?= htmlspecialchars((string) $sesion['email']) ?>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li class="px-3 py-1 small text-body-secondary">
+                <?= $sesion['roles'] === []
+                      ? 'sin roles'
+                      : htmlspecialchars(implode(' · ', $sesion['roles'])) ?>
+              </li>
+              <li class="px-3 pb-1 small text-body-secondary">
+                alcanza <?= count($permisos) ?>
+                <?= count($permisos) === 1 ? 'ruta' : 'rutas' ?>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="/salir" class="px-3 py-1">
+                  <button class="btn btn-sm btn-outline-danger w-100" type="submit">
+                    Salir
+                  </button>
+                </form>
+              </li>
+            </ul>
+          </li>
+
+        <?php else: ?>
+          <?php /* Sin sesion solo se sirve /entrar, asi que el menu no tiene
+                   a donde llevar. */ ?>
+          <li class="nav-item">
+            <span class="navbar-text small">sin sesión</span>
+          </li>
+        <?php endif; ?>
       </ul>
     </div>
   </nav>

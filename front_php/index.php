@@ -109,6 +109,16 @@ function pintar(string $vista, array $datos = []): void
     $datos += ['errores' => [], 'ruta' => $GLOBALS['ruta'] ?? '/'];
     $datos['aviso'] = aviso_pendiente();
 
+    // Quien está dentro y qué alcanza, para la cabecera y el menú (v3).
+    // Van SIEMPRE, con valores vacíos si no hay sesión: así la plantilla no
+    // tiene que preguntar si existen —y la pantalla de entrar usa el mismo
+    // marco que todas las demás—.
+    $datos['sesion'] = [
+        'email' => $_SESSION['email'] ?? null,
+        'roles' => $_SESSION['roles'] ?? [],
+    ];
+    $datos['permisos'] = $_SESSION['permisos'] ?? [];
+
     // El motor activo, para el pie de página (ver `diagnostico()` en
     // cliente_api.php). Si la API no responde queda en null, y el pie
     // simplemente no lo muestra: que no se sepa el motor no es motivo para
@@ -143,6 +153,140 @@ function a_numero(string $texto, string $tipo)
         return ctype_digit(ltrim($texto, '-')) ? (int) $texto : $texto;
     }
     return is_numeric($texto) ? (float) $texto : $texto;
+}
+
+// ======================================================================
+// LA GUARDIA DEL FRONT  (v3)
+// ======================================================================
+//
+// Desde la v3 no se ve una sola pantalla sin identificarse. Y está escrito
+// igual que en la API, por el mismo motivo: **que el olvido sea difícil.**
+//
+//   · una LISTA BLANCA con lo que se sirve sin sesión, que son dos cosas;
+//   · UNA línea que manda a `/entrar` todo lo demás, aquí arriba, antes de
+//     cualquier bloque de pantalla.
+//
+// Para dejar una pantalla abierta por accidente habría que agregarla a la
+// lista blanca, y eso se ve en el `diff`.
+//
+// Y HAY QUE DECIR QUÉ PROTEGE ESTO Y QUÉ NO. Esta guardia evita que alguien
+// sin sesión vea el armazón de una pantalla; **los datos no los protege
+// ella**, los protege la API, que responde 401 sin token y 403 sin permiso
+// aunque la petición venga de este front, de Postman o de `curl`. Si esta
+// línea se borrara, el front enseñaría pantallas vacías con mensajes de
+// error — fea, pero sin un dato de más.
+$SIN_SESION = ['/entrar'];
+
+if (!in_array($ruta, $SIN_SESION, true) && !hay_sesion()) {
+    // Se recuerda a dónde quería ir, para llevarlo ahí después de entrar en
+    // vez de dejarlo siempre en el inicio. Es comodidad, y es de las que se
+    // notan: la dirección que alguien guardó en marcadores sigue sirviendo.
+    $_SESSION['destino'] = $ruta;
+    header('Location: /entrar');
+    exit;
+}
+
+// ======================================================================
+// ENTRAR Y SALIR  —  /entrar  ·  /salir
+// ======================================================================
+if ($ruta === '/entrar') {
+    if ($metodo === 'GET') {
+        // Si ya hay sesión, no se pinta el formulario otra vez: al inicio.
+        if (hay_sesion()) {
+            header('Location: /');
+            exit;
+        }
+        pintar('entrar', ['email' => '']);
+        exit;
+    }
+
+    if ($metodo === 'POST') {
+        $email      = trim((string) ($_POST['email'] ?? ''));
+        $contrasena = (string) ($_POST['contrasena'] ?? '');
+
+        $r = entrar($email, $contrasena);
+
+        if ($r['ok']) {
+            // El destino guardado por la guardia, si había uno.
+            $destino = $_SESSION['destino'] ?? '/';
+            unset($_SESSION['destino']);
+            redirigir_con($destino, 'exito',
+                          'Hola, ' . ($r['datos']['email'] ?? $email) . '.');
+        }
+
+        // Se repinta el formulario CON el correo escrito y sin la contraseña.
+        // Lo segundo es deliberado: una contraseña no vuelve a la pantalla ni
+        // dentro de un campo oculto.
+        pintar('entrar', ['email' => $email, 'errores' => $r['errores']]);
+        exit;
+    }
+
+    pintar('no_encontrada', ['ruta' => $ruta]);
+    exit;
+}
+
+if ($ruta === '/salir') {
+    // Salir es un POST y no un enlace, y es a propósito: un GET que cambia
+    // algo —aquí, cerrar la sesión— lo puede disparar cualquier cosa que
+    // cargue una dirección, desde una imagen hasta el prefetch del navegador.
+    if ($metodo === 'POST') {
+        salir();
+        session_start();                 // una sesión nueva, solo para el aviso
+        redirigir_con('/entrar', 'exito', 'Sesión cerrada.');
+    }
+    pintar('no_encontrada', ['ruta' => $ruta]);
+    exit;
+}
+
+// ======================================================================
+// EL TABLERO  —  /tablero  ·  /tablero/{consulta}     (v4)
+// ======================================================================
+//
+// La pantalla que estrena la v4. Dos rutas y ni una tercera:
+//
+//   /tablero                 las diez consultas, con su título
+//   /tablero/{nombre}        una consulta, con sus filas en una tabla
+//
+// LA TABLA SE PINTA SIN SABER QUÉ COLUMNAS TRAE. Las diez devuelven columnas
+// distintas —`ingreso`, `ticket_promedio`, `sus_roles`— y la vista recorre
+// las claves de la primera fila para armar el encabezado.
+//
+// Eso es lo contrario de lo que hacen las seis pantallas del CRUD, que tienen
+// sus columnas escritas una por una. Y la diferencia está razonada: una ficha
+// de producto tiene campos que se escriben, se validan y se traducen al
+// español; una fila de reporte es el resultado de una pregunta, y el nombre
+// de su columna ES la respuesta. Inventarle un formulario a cada una serían
+// diez pantallas que nadie mantiene.
+if ($ruta === '/tablero') {
+    $r = listar_consultas();
+    pintar('tablero', ['seccion' => 'indice',
+                       'consultas' => $r['datos'],
+                       'errores' => $r['errores']]);
+    exit;
+}
+
+if (str_starts_with($ruta, '/tablero/')) {
+    $nombre = substr($ruta, strlen('/tablero/'));
+
+    // El índice se pide igual, porque la pantalla de una consulta también
+    // muestra el menú de las diez: una llamada más, y el usuario no tiene que
+    // volver atrás para ver otra.
+    $indice = listar_consultas();
+    $titulo = $nombre;
+    foreach ($indice['datos'] as $c) {
+        if (($c['nombre'] ?? '') === $nombre) {
+            $titulo = $c['titulo'];
+        }
+    }
+
+    $r = consulta($nombre);
+    pintar('tablero', ['seccion' => 'consulta',
+                       'consultas' => $indice['datos'],
+                       'nombre' => $nombre,
+                       'titulo' => $titulo,
+                       'filas' => $r['datos'],
+                       'errores' => $r['errores']]);
+    exit;
 }
 
 // ----------------------------------------------------------------------

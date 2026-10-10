@@ -73,11 +73,29 @@ function llamar_api(string $metodo, string $ruta, ?array $cuerpo = null): ?array
 {
     $curl = curl_init(URL_API . $ruta);
 
+    // ------------------------------------------------------------------
+    // EL TOKEN VA EN TODAS LAS PETICIONES (v3)
+    // ------------------------------------------------------------------
+    //
+    // Desde la v3 la API esta cerrada: sin esta cabecera responde 401 a todo
+    // menos al diagnostico y a la puerta de entrada. Se pone AQUI, en el
+    // unico sitio que habla HTTP, y no en cada una de las cuarenta funciones
+    // de abajo: si estuviera en cada una, la que se olvide es la que falla.
+    //
+    // Y se pone solo SI HAY token. Las dos rutas abiertas de la API —el
+    // diagnostico y `POST /api/sesion`— se piden sin sesion, y mandarles una
+    // cabecera vacia seria peor que no mandar nada.
+    $cabeceras = ['Content-Type: application/json'];
+    $token = $_SESSION['token'] ?? null;
+    if (is_string($token) && $token !== '') {
+        $cabeceras[] = 'Authorization: Bearer ' . $token;
+    }
+
     curl_setopt_array($curl, [
         CURLOPT_RETURNTRANSFER => true,          // devolver la respuesta, no imprimirla
         CURLOPT_CUSTOMREQUEST  => $metodo,       // GET, POST, PUT, PATCH, DELETE
         CURLOPT_TIMEOUT        => TIEMPO_MAXIMO,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_HTTPHEADER     => $cabeceras,
     ]);
 
     if ($cuerpo !== null) {
@@ -150,7 +168,12 @@ function resultado_de(?array $r): array
     if ($r === null) {
         return ['ok' => false, 'datos' => null, 'errores' => NO_DISPONIBLE];
     }
-    return $r['codigo'] === 200
+    // El 201 se suma en la v3: los recursos nuevos —rol, ruta, usuario— sí
+    // responden «creado» con su código propio, mientras los seis de la v2
+    // responden 200. Dos códigos para la misma idea es una inconsistencia del
+    // contrato, y está anotada en PENDIENTES; el front no la puede arreglar,
+    // pero sí tiene que aceptar los dos o mostraría un error donde hubo éxito.
+    return in_array($r['codigo'], [200, 201], true)
         ? ['ok' => true, 'datos' => $r['cuerpo'], 'errores' => []]
         : ['ok' => false, 'datos' => null, 'errores' => mensajes_de_error($r['cuerpo'])];
 }
@@ -443,4 +466,149 @@ function anular_factura(int $numero): array
 function eliminar_factura(int $numero): array
 {
     return resultado_de(llamar_api('DELETE', "/api/factura/$numero"));
+}
+
+// ======================================================================
+// LA SESION  —  /api/sesion   (v3)
+// ======================================================================
+//
+// DONDE SE GUARDA EL TOKEN, y es la decision que hay que poder defender: en
+// `$_SESSION`, que vive EN EL SERVIDOR. Al navegador solo le llega el
+// identificador de sesion de PHP, en una cookie que el propio PHP marca como
+// HttpOnly —JavaScript no la puede leer—.
+//
+// La alternativa, guardarlo en `localStorage` como hace un front de JS, deja
+// el token al alcance de cualquier script que entre en la pagina. Aqui ni
+// siquiera es una tentacion: **este front no tiene JavaScript que pida
+// datos.** El token nunca sale del servidor.
+//
+// Y HAY UNA COSA QUE EL FRONT NO GUARDA: el permiso. Guarda la LISTA para
+// pintar el menu, y nada mas. Cada peticion se vuelve a comprobar en la API
+// —que consulta `verificar_acceso_ruta` en la base de datos—, asi que quitarle
+// un rol a alguien tiene efecto en la peticion siguiente, no cuando caduque
+// su token.
+// ======================================================================
+
+/**
+ * Entra: cambia correo y contrasena por un token.
+ *
+ * Es la UNICA funcion del front que manda una contrasena, y viaja en el
+ * cuerpo de un POST —nunca en la URL—: una contrasena en la direccion queda
+ * en el historial del navegador, en los registros del servidor y en el
+ * «Referer» de la peticion siguiente.
+ */
+function entrar(string $email, string $contrasena): array
+{
+    $r = llamar_api('POST', '/api/sesion',
+                    ['email' => $email, 'contrasena' => $contrasena]);
+
+    if ($r === null) {
+        return ['ok' => false, 'datos' => null, 'errores' => NO_DISPONIBLE];
+    }
+    if ($r['codigo'] !== 200) {
+        // El 401 de aqui dice «el correo o la contrasena no son correctos», sin
+        // decir CUAL de los dos falla. No es un descuido del mensaje: decir
+        // «ese correo no existe» le confirma a quien prueba al azar que los
+        // demas si existen.
+        return ['ok' => false, 'datos' => null,
+                'errores' => mensajes_de_error($r['cuerpo'])];
+    }
+
+    // La sesion se REGENERA al entrar: el identificador de sesion que trajo
+    // el navegador antes de identificarse se tira. Sin esto, alguien que
+    // hubiera conseguido fijar ese identificador seguiria dentro de la sesion
+    // ya autenticada —se llama «fijacion de sesion», y la defensa es esta
+    // linea—.
+    session_regenerate_id(true);
+
+    $_SESSION['token']   = $r['cuerpo']['token'];
+    $_SESSION['email']   = $r['cuerpo']['email'];
+    $_SESSION['roles']   = $r['cuerpo']['roles'] ?? [];
+    $_SESSION['expira']  = $r['cuerpo']['expira'] ?? null;
+    $_SESSION['permisos'] = permisos_desde_la_api();
+
+    return ['ok' => true, 'datos' => $r['cuerpo'], 'errores' => []];
+}
+
+/** Las rutas a las que llega quien esta dentro. Para el MENU, nada mas. */
+function permisos_desde_la_api(): array
+{
+    $r = llamar_api('GET', '/api/permisos/mios');
+    if ($r === null || $r['codigo'] !== 200) {
+        return [];
+    }
+    return $r['cuerpo']['datos'] ?? [];
+}
+
+/** Sale: le dice a la API y borra la sesion de PHP. */
+function salir(): void
+{
+    // Se avisa a la API —que con un token firmado no puede hacer gran cosa,
+    // y por eso el aviso es cortesia y no seguridad: un JWT no se puede
+    // «apagar» desde el servidor sin una lista negra—. Lo que de verdad
+    // cierra la sesion es borrar el token de aqui.
+    llamar_api('DELETE', '/api/sesion');
+
+    $_SESSION = [];
+    session_destroy();
+}
+
+/** Quien esta dentro, segun la propia API (no segun lo que guardamos). */
+function quien_soy(): array
+{
+    return resultado_de_lectura(llamar_api('GET', '/api/sesion'));
+}
+
+/** True si hay sesion abierta en este front. */
+function hay_sesion(): bool
+{
+    return is_string($_SESSION['token'] ?? null) && $_SESSION['token'] !== '';
+}
+
+/**
+ * True si quien esta dentro alcanza esa ruta.
+ *
+ * **ESTO NO ES CONTROL DE ACCESO.** Es comodidad: sirve para no pintar un
+ * boton que va a responder 403. El control de acceso esta en la API, que
+ * consulta la base de datos en cada peticion — escriba la direccion a mano y
+ * lo comprueba.
+ */
+function puede(string $ruta): bool
+{
+    return in_array($ruta, $_SESSION['permisos'] ?? [], true);
+}
+
+// ======================================================================
+// LAS DIEZ CONSULTAS  —  /api/consultas   (v4)
+// ======================================================================
+//
+// Dos funciones para diez consultas, y aqui SI es correcto que sean
+// genericas: el nombre de la consulta no es un recurso, es el nombre de un
+// REPORTE, y la respuesta tiene la misma forma en las diez —`{consulta,
+// total, datos}` con columnas distintas—. No hay cinco operaciones que
+// ofrecer por cada una: hay una, leer.
+//
+// Compare con `listar_productos` / `crear_producto` / ...: ahi lo generico
+// habria ofrecido operaciones que algunos recursos no tienen. La diferencia
+// no es el gusto, es si la forma del contrato es la misma o no.
+
+/** El indice de las diez, para el menu del tablero. */
+function listar_consultas(): array
+{
+    return resultado_de_listado(llamar_api('GET', '/api/consultas'));
+}
+
+/** Una consulta por su nombre. Devuelve las filas tal como llegan. */
+function consulta(string $nombre): array
+{
+    $r = llamar_api('GET', '/api/consultas/' . rawurlencode($nombre));
+    if ($r === null) {
+        return ['ok' => false, 'datos' => [], 'errores' => NO_DISPONIBLE];
+    }
+    if ($r['codigo'] === 200) {
+        return ['ok' => true, 'datos' => $r['cuerpo']['datos'] ?? [],
+                'errores' => []];
+    }
+    return ['ok' => false, 'datos' => [],
+            'errores' => mensajes_de_error($r['cuerpo'])];
 }
