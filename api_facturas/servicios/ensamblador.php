@@ -54,6 +54,8 @@ require_once __DIR__ . '/ServicioPersona.php';
 require_once __DIR__ . '/ServicioCliente.php';
 require_once __DIR__ . '/ServicioVendedor.php';
 require_once __DIR__ . '/ServicioFactura.php';
+require_once __DIR__ . '/ServicioRuta.php';
+require_once __DIR__ . '/ServicioRol.php';
 
 // --- MariaDB ---
 require_once __DIR__ . '/../repositorios/RepositorioProductoMariaDB.php';
@@ -62,6 +64,8 @@ require_once __DIR__ . '/../repositorios/RepositorioPersonaMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioClienteMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorMariaDB.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaMariaDB.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolMariaDB.php';
 
 // --- PostgreSQL ---
 require_once __DIR__ . '/../repositorios/RepositorioProductoPostgres.php';
@@ -70,6 +74,8 @@ require_once __DIR__ . '/../repositorios/RepositorioPersonaPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioClientePostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorPostgres.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaPostgres.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolPostgres.php';
 
 // --- SQL Server ---
 require_once __DIR__ . '/../repositorios/RepositorioProductoSqlServer.php';
@@ -78,6 +84,8 @@ require_once __DIR__ . '/../repositorios/RepositorioPersonaSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioClienteSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioVendedorSqlServer.php';
 require_once __DIR__ . '/../repositorios/RepositorioFacturaSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioRutaSqlServer.php';
+require_once __DIR__ . '/../repositorios/RepositorioRolSqlServer.php';
 
 /**
  * Qué motor está activo: `'mariadb'`, `'postgres'` o `'sqlserver'`.
@@ -222,4 +230,30 @@ function crearServicioFactura(): IServicioFactura
     };
 
     return new ServicioFactura($repositorio);
+}
+
+function crearServicioRol(): IServicioRol
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioRolPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioRolSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioRolMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioRol($repositorio);
+}
+
+function crearServicioRuta(): IServicioRuta
+{
+    [$dsn, $usuario, $clave] = datosDeConexion();
+
+    $repositorio = match (motorActivo()) {
+        'postgres'  => new RepositorioRutaPostgres($dsn, $usuario, $clave),
+        'sqlserver' => new RepositorioRutaSqlServer($dsn, $usuario, $clave),
+        default     => new RepositorioRutaMariaDB($dsn, $usuario, $clave),
+    };
+
+    return new ServicioRuta($repositorio);
 }

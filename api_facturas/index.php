@@ -47,6 +47,8 @@ require_once __DIR__ . '/controladores/ControladorPersona.php';
 require_once __DIR__ . '/controladores/ControladorCliente.php';
 require_once __DIR__ . '/controladores/ControladorVendedor.php';
 require_once __DIR__ . '/controladores/ControladorFactura.php';
+require_once __DIR__ . '/controladores/ControladorRuta.php';
+require_once __DIR__ . '/controladores/ControladorRol.php';
 
 // Toda respuesta de esta API es JSON — se avisa en el encabezado HTTP:
 header('Content-Type: application/json; charset=utf-8');
@@ -82,6 +84,8 @@ if ($ruta === '/' && $metodo === 'GET') {
         'recursos'  => [
             '/api/producto', '/api/empresa', '/api/persona',
             '/api/cliente', '/api/vendedor', '/api/factura',
+            '/api/ruta',
+            '/api/rol',
         ],
         'contratos' => 'docs/spec_kit/versiones/v4_sqlserver/6_contracts.md',
     ], JSON_UNESCAPED_UNICODE);
@@ -253,6 +257,76 @@ if (str_starts_with($ruta, '/api/vendedor/')) {
         $controlador->actualizar($id, $body);
     } elseif ($metodo === 'DELETE') {
         $controlador->eliminar($id);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// ROL — la llave la GENERA la base de datos: el POST no la lleva
+// ======================================================================
+if ($ruta === '/api/rol') {
+    $controlador = new ControladorRol(crearServicioRol());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/rol/')) {
+    $controlador = new ControladorRol(crearServicioRol());
+    // La llave viaja en la URL como texto y aqui se convierte: la frontera
+    // es el unico sitio donde se hace esa conversion.
+    $llave = (int) urldecode(substr($ruta, strlen('/api/rol/')));
+
+    if ($metodo === 'GET') {
+        $controlador->obtener($llave);
+    } elseif ($metodo === 'PUT') {
+        $controlador->reemplazar($llave, $body);
+    } elseif ($metodo === 'PATCH') {
+        $controlador->actualizar($llave, $body);
+    } elseif ($metodo === 'DELETE') {
+        $controlador->eliminar($llave);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+// ======================================================================
+// RUTA — la llave la GENERA la base de datos: el POST no la lleva
+// ======================================================================
+if ($ruta === '/api/ruta') {
+    $controlador = new ControladorRuta(crearServicioRuta());
+    if ($metodo === 'GET') {
+        $controlador->listar();
+    } elseif ($metodo === 'POST') {
+        $controlador->crear($body);
+    } else {
+        responderNoPermitido();
+    }
+    return;
+}
+
+if (str_starts_with($ruta, '/api/ruta/')) {
+    $controlador = new ControladorRuta(crearServicioRuta());
+    // La llave viaja en la URL como texto y aqui se convierte: la frontera
+    // es el unico sitio donde se hace esa conversion.
+    $llave = (int) urldecode(substr($ruta, strlen('/api/ruta/')));
+
+    if ($metodo === 'GET') {
+        $controlador->obtener($llave);
+    } elseif ($metodo === 'PUT') {
+        $controlador->reemplazar($llave, $body);
+    } elseif ($metodo === 'PATCH') {
+        $controlador->actualizar($llave, $body);
+    } elseif ($metodo === 'DELETE') {
+        $controlador->eliminar($llave);
     } else {
         responderNoPermitido();
     }
