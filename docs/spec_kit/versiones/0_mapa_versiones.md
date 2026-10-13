@@ -20,7 +20,7 @@
 | **v1** | [`proyecto_php1`](https://github.com/ccastro2050/proyecto_php1) | El CRUD de **producto** de punta a punta: API (PHP puro + PDO) contra **MariaDB** **y su front**. Una tabla, un motor. | Arquitectura en capas con `interface` de PHP desde el día 1, y la separación front/API a nivel de sistema |
 | **v2** | [`proyecto_php2`](https://github.com/ccastro2050/proyecto_php2) | Seis recursos: producto, **empresa, persona, cliente, vendedor y factura**, con sus pantallas. Sigue siendo solo MariaDB. | **Llaves foráneas e integridad**; **maestro-detalle** con triggers y procedimientos almacenados; el 409 |
 | **v3** | [`proyecto_php3`](https://github.com/ccastro2050/proyecto_php3) | Lo mismo, **sin una funcionalidad nueva**, ahora también contra **PostgreSQL**, escogido por configuración | Nace la **fábrica** — abierto/cerrado en acción: cero cambios en controladores ni pantallas, y se comprueba con un `diff` |
-| **v4** | **`proyecto_php4`** ← **USTED ESTÁ AQUÍ** | Tercer motor (**SQL Server**), los tres a la vez, compose completo | Que el sistema **siga** abierto: aguantar la segunda extensión, no solo la primera |
+| **v4** | **`proyecto_php4`** ← **USTED ESTÁ AQUÍ** | Tercer motor (**SQL Server**), los tres a la vez, compose completo. **Y el aplicativo**: control de acceso, `usuario-con-roles` y diez consultas con su tablero | Que el sistema **siga** abierto: aguantar la segunda extensión, no solo la primera. Y que las seis tablas del acceso dejen de ser una promesa sin cumplir |
 
 **Un repositorio por versión, y no una rama por versión.** La razón es
 práctica: así se pueden tener dos versiones **encendidas al mismo tiempo** y
@@ -130,15 +130,39 @@ v4 es más corta, y no porque se haya hecho menos: es porque la v3 dejó el
 sitio preparado. Ésa es la diferencia entre una arquitectura que aguantó una
 extensión y una que aguanta las que vengan.
 
-## Y aquí termina la ruta
+## La v4 creció, y conviene saber qué decía este documento antes
 
-No hay v5, y es una decisión, no un abandono.
+Hasta octubre de 2026 esta sección se llamaba «Y aquí termina la ruta» y
+decía dos cosas: que un cuarto motor no enseñaría nada nuevo, y que el
+control de acceso —**esas seis tablas que la base de datos trae desde la v1 y
+que ningún código nombraba**— era un tema entero que merecía su propio curso
+y no un apéndice.
 
-Un cuarto motor no enseñaría nada que la tercera columna no haya mostrado ya.
-Y el control de acceso —esas seis tablas que la base trae desde la v1 y que
-ningún código nombra— es un tema entero, con sesiones, hashing y permisos por
-ruta, que merece su propio curso y no un apéndice.
+La primera sigue en pie. La segunda se revisó, y la razón es concreta: las
+otras cuatro rutas del semestre —dos en .NET, una en Python, y el proyecto de
+cátedras— llegan a su v4 con el control de acceso encendido, y **las cinco
+v4 tienen que ser equivalentes**. Lo que cambia entre ellas es el stack, no
+lo que el sistema hace. Una ruta de PHP que se quedara en «tres motores»
+dejaría al estudiante de PHP sin el tema que los demás sí ven.
+
+Así que la v4 de PHP hace las dos cosas: cierra la familia de motores **y**
+enciende el aplicativo. Lo que entró, en tres etapas, está en
+`v4_aplicativo/8_tasks.md`:
+
+| | Qué | Por qué aquí |
+|---|---|---|
+| **A** | El control de acceso: entrar, token, 401 y 403, y los cinco recursos del acceso con sus pantallas | Una tabla que existe y no se usa es una promesa sin cumplir. Estaban desde la v1 |
+| **B** | `/api/usuario-con-roles` | Crear un usuario con dos roles eran tres peticiones, y si fallaba la segunda quedaba a medias |
+| **C** | Las diez consultas y el tablero | El CRUD responde «qué hay en esta tabla»; nada respondía «qué se vende y cuánto deja» |
+
+## Y aquí sí termina la ruta
+
+**No hay v5, y sigue siendo una decisión, no un abandono.** Lo que un v5
+tendría —otro motor, u otro front— ya está contado: los motores son
+justamente el tema de la v3 y la v4, y el front va **dentro de cada
+versión** desde la v1, no al final como premio.
 
 **Una ruta de versiones también se diseña sabiendo dónde parar.** Estirarla
 para que parezca más completa es la forma más común de arruinar un buen
-ejemplo.
+ejemplo. Y corregirla cuando una razón deja de valer no es incumplir eso: es
+lo contrario de estirarla por inercia.

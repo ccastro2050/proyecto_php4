@@ -1,4 +1,4 @@
-# Especificación — Versión 4: el tercer motor y el compose completo
+# Especificación — Versión 4: el tercer motor, el control de acceso y el aplicativo
 
 > **Versión 4** del desarrollo incremental ([mapa de versiones](../0_mapa_versiones.md)).
 > Rige la constitución del proyecto: [../../1_constitution.md](../../1_constitution.md).
@@ -201,3 +201,112 @@ Los 13 criterios pasan → commit + tag `v4`.
 | C5 | ¿`TrustServerCertificate=yes` no es un riesgo? | **En este entorno no, y en producción sí** — por eso está comentado en el compose. SQL Server se genera un certificado propio; aceptarlo sin verificar está bien en un curso y estaría mal en un sistema real. Decirlo es parte de enseñarlo. | compose · 4_research D3 |
 | C6 | Si `sqlserver-init` corre otra vez, ¿duplica los datos? | **No: comprueba primero si la base existe.** Un inicializador que solo funcione la primera vez es una trampa esperando a que alguien vuelva a levantar el sistema. | RF6 |
 | C7 | ¿Se puede quitar MariaDB ahora que hay tres? | **No, y ninguno de los tres.** El punto de la ruta es que los tres funcionan a la vez con el mismo código. Quitar uno sería quitar la demostración. | Alcance |
+
+
+---
+
+# ANEXO A LA v4 — LO QUE SE AGREGÓ DESPUÉS DEL TERCER MOTOR
+
+Este anexo no corrige nada de lo anterior: lo que dice el documento sobre
+SQL Server y el compose de tres motores sigue valiendo palabra por palabra.
+Lo que hace es **decir el resto**, porque la v4 acabó trayendo tres cosas más
+que el documento no mencionaba, y un documento que describe menos de lo que
+el código hace es peor que no tenerlo: el que lo lee cree que ya sabe.
+
+Las tres, en el orden en que se construyeron:
+
+| | Qué entró | Por qué en esta versión |
+|---|---|---|
+| **A** | El **control de acceso**: entrar con contraseña, token, 401 y 403 | Las seis tablas estaban en la base de datos desde la v1 y no las usaba nadie. Una tabla que no se usa es una promesa sin cumplir |
+| **B** | **`/api/usuario-con-roles`**: el usuario y sus roles en una operación | Crear un usuario con dos roles eran tres peticiones, y si fallaba la segunda quedaba a medias |
+| **C** | Las **diez consultas** y el **tablero** | El CRUD responde «qué hay en esta tabla». Nada respondía «qué se vende y cuánto deja» |
+
+Y con eso esta v4 queda **equivalente a las otras cuatro de la ruta** —.NET
+con Blazor, .NET con Flask, Python con Flask— en lo que hacen. Lo que cambia
+entre las cinco es el stack, no el alcance.
+
+## A. El control de acceso
+
+### A.1 Requisitos funcionales
+
+| Id | Requisito |
+|---|---|
+| RF-A1 | `POST /api/sesion` recibe correo y contraseña y devuelve un **token** firmado, el correo, los roles y la fecha de vencimiento |
+| RF-A2 | Toda la API exige la cabecera `Authorization: Bearer <token>`, **salvo dos rutas**: `GET /` (el diagnóstico) y `POST /api/sesion` (la puerta) |
+| RF-A3 | Sin token o con token inválido: **401**. Con token válido y sin permiso para esa ruta: **403**. Son dos respuestas distintas porque son dos problemas distintos |
+| RF-A4 | El permiso se consulta **en cada petición** contra la base de datos (`verificar_acceso_ruta`), no se lee del token |
+| RF-A5 | `GET /api/permisos/mios` devuelve las rutas que alcanza quien pregunta, para que el front arme su menú |
+| RF-A6 | Las contraseñas se guardan con **bcrypt costo 12**. La API nunca las devuelve: `GET /api/usuario` trae el correo y nada más |
+| RF-A7 | Los cinco recursos del acceso —`rol`, `ruta`, `usuario`, `rutarol`, `rol-usuario`— tienen su CRUD, **con una excepción declarada**: las dos tablas puente no admiten PUT ni PATCH |
+| RF-A8 | El front: pantalla de entrar, guardia que manda a `/entrar`, menú armado con los permisos, y pantalla para cada uno de los cinco recursos |
+
+### A.2 Las dos decisiones que hay que poder defender
+
+**EL PERMISO NO VA EN EL TOKEN.** Cabría —el token es un JSON firmado— y
+sería más rápido: una petición menos a la base de datos. Y está descartado a
+propósito: si el permiso viajara dentro, quitarle un rol a alguien no tendría
+efecto hasta que su token venciera. Con la consulta en cada petición, el
+cambio se nota en **la petición siguiente**. Se paga una consulta por
+petición para que la tabla `rutarol` sea la verdad y no una copia vieja.
+
+**EL TOKEN ESTÁ FIRMADO, NO CIFRADO.** Cualquiera puede leer su contenido
+—son dos bloques de base64 y el navegador los decodifica—. Lo que nadie
+puede es **cambiarlo**: la firma se rompe. Por eso dentro no va ni un dato
+secreto, solo el correo, los roles y las dos fechas.
+
+### A.3 Criterios de aceptación
+
+| Id | Criterio | Cómo se comprueba |
+|---|---|---|
+| CA-A1 | Sin token, cualquier ruta responde 401 | `Invoke-RestMethod http://localhost:8090/api/producto` sin cabecera |
+| CA-A2 | Con el token de `vendedor1`, `/api/usuario` responde **403** y `/api/factura` responde 200 | Dos peticiones con el mismo token |
+| CA-A3 | El 403 **no depende del front**: se obtiene escribiendo la dirección a mano o desde Postman | Entrar al front como `vendedor1` y pedir `/productos` |
+| CA-A4 | Quitarle el rol a un usuario le cierra la ruta **sin cerrar su sesión** | Borrar la fila de `rol_usuario` y repetir la misma petición con el mismo token: 200 → 403 |
+| CA-A5 | Las contraseñas sembradas son usables y están **escritas en la documentación** | Entrar con las tres cuentas de la pantalla de entrar |
+| CA-A6 | Una ruta no declarada en la tabla `ruta` **no deja pasar a nadie** (fallar cerrado) | Pedir una ruta cuyo nombre no exista en la tabla |
+
+## B. `usuario-con-roles`
+
+| Id | Requisito |
+|---|---|
+| RF-B1 | `POST` crea el usuario **y** le da sus roles en una sola petición |
+| RF-B2 | `PUT` reemplaza contraseña y roles; `PATCH` cambia solo lo que llegue |
+| RF-B3 | `DELETE` borra el usuario y sus filas de `rol_usuario` |
+| RF-B4 | `GET` (uno y lista) devuelve cada usuario con su lista de roles **en una consulta**, no una por usuario |
+| RF-B5 | La operación es **atómica**: si un rol no existe, no queda ni el usuario creado ni los roles a medias |
+
+El RF-B5 es el que importa, y es el que **falló al medirlo**: ver el anexo de
+`4_research.md`. Los procedimientos de MariaDB no tenían transacción.
+
+## C. Las diez consultas y el tablero
+
+| Id | Requisito |
+|---|---|
+| RF-C1 | Diez consultas de solo lectura bajo `/api/consultas/...`, **todas GET** |
+| RF-C2 | Cada una cruza **cuatro o más tablas**: una consulta de una sola la responde el CRUD |
+| RF-C3 | El sobre es `{consulta, total, datos}` —no `{tabla, limite, total, datos}`—, porque ninguna sale de una sola tabla y un reporte no se pagina |
+| RF-C4 | Las diez exigen el permiso `/home`, el de entrar al aplicativo |
+| RF-C5 | `GET /api/consultas` devuelve el índice de las diez, para que el front no las tenga escritas a mano |
+| RF-C6 | El front tiene un **tablero**: el índice y una pantalla por consulta |
+| RF-C7 | Las diez dan el mismo resultado en los **tres motores**, con el SQL escrito como cada uno lo entiende |
+
+### Criterios de aceptación
+
+| Id | Criterio | Cómo se comprueba |
+|---|---|---|
+| CA-C1 | Las diez corren en los tres motores y devuelven las columnas del contrato | `php pruebas/prueba_consultas_tres_motores.php` con `MOTOR` en los tres valores |
+| CA-C2 | Tres de las diez pueden devolver **cero filas** con los datos sembrados, y eso no es un error | La pantalla lo dice con esas palabras, y explica cómo hacer que respondan |
+| CA-C3 | Un POST, PUT, PATCH o DELETE a una consulta responde **405** | Cualquiera de las diez con otro verbo |
+| CA-C4 | El `ticket_promedio` coincide con `total / facturas` en los tres motores | La misma prueba lo calcula y lo compara |
+
+## Definición de TERMINADA, al cierre de la v4
+
+A lo que ya decía el documento se le suman cuatro líneas:
+
+- la API está **cerrada**: dos rutas abiertas y declaradas, el resto exige token;
+- los **once** recursos tienen su CRUD y su pantalla, y los dos puentes tienen
+  declarado por escrito por qué les faltan dos verbos;
+- las **diez consultas** pasan en los tres motores, medido con una prueba que
+  se puede volver a correr;
+- y el front **no muestra lo que va a rechazar**: el menú, las tarjetas del
+  inicio y los botones se arman con los permisos que responde la API.

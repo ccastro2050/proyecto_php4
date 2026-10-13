@@ -1,4 +1,4 @@
-# Tareas — Versión 4: el tercer motor
+# Tareas — Versión 4: el tercer motor, el control de acceso y el aplicativo
 
 > **Versión 4** · El orden de construcción, partiendo del estado que dejó la
 > v3. Requisitos: [2_spec.md](2_spec.md) · técnica: [3_plan.md](3_plan.md) ·
@@ -115,3 +115,53 @@ aparece **una sola vez** en cada pantalla.
 
 **La v4 está TERMINADA, y con ella la ruta de versiones.** No hay v5 — el
 porqué está en [4_research.md](4_research.md) D8.
+
+
+---
+
+# ANEXO — LAS TRES ETAPAS QUE SIGUIERON AL TERCER MOTOR
+
+Las nueve fases de arriba cierran el tercer motor. Lo que la v4 hizo después
+fue esto, y en este orden, que no es casual: **primero los recursos que
+faltaban, después la puerta, y al final las consultas.** Cerrar la API antes
+de tener los recursos habría obligado a probar cada uno con token desde el
+primer día, y los fallos de las dos cosas se habrían confundido.
+
+## Etapa A — Los cinco recursos del control de acceso
+
+| # | Tarea | Hecho |
+|---|---|---|
+| A1 | Los tres modelos: `Rol`, `Ruta`, `Usuario` | ✅ |
+| A2 | Siete interfaces de repositorio y sus 21 implementaciones (tres motores) | ✅ |
+| A3 | `rutarol` y `rol-usuario` **sin** PUT ni PATCH: los dos verbos escritos y comentados, con la razón al lado | ✅ |
+| A4 | Las contraseñas sembradas, con hash **conocido** y escrito en la documentación | ✅ |
+| A5 | La conversión explícita del booleano (ver tropiezo 1 de `4_research.md`) | ✅ |
+
+## Etapa B — La puerta y la guardia
+
+| # | Tarea | Hecho |
+|---|---|---|
+| B1 | `autorizacion/jwt.php`: firmar y leer un JWT HS256 **a mano**, con `hash_equals` | ✅ |
+| B2 | `autorizacion/guardia.php`: `exigirSesion()` y `exigirPermiso()`, que responden y cortan | ✅ |
+| B3 | La lista blanca de dos rutas y **una** llamada a la guardia en el enrutador | ✅ |
+| B4 | `POST /api/sesion`, `GET /api/sesion`, `DELETE /api/sesion`, `POST /api/sesion/renovar` | ✅ |
+| B5 | `GET /api/permisos/mios`, para el menú del front | ✅ |
+| B6 | El front: pantalla de entrar, guardia, menú por permisos, salir con POST | ✅ |
+
+## Etapa C — `usuario-con-roles`, las diez consultas y el tablero
+
+| # | Tarea | Hecho |
+|---|---|---|
+| C1 | `/api/usuario-con-roles` con sus cinco operaciones y sus tres repositorios | ✅ |
+| C2 | La transacción en los ocho procedimientos de MariaDB (tropiezo 5) | ✅ |
+| C3 | Las diez consultas, tres dialectos, con el SQL a la vista | ✅ |
+| C4 | `pruebas/prueba_consultas_tres_motores.php`: las diez contra los tres | ✅ |
+| C5 | El tablero del front: el índice y una pantalla por consulta | ✅ |
+| C6 | Las seis pantallas de administración, un archivo por entidad | ✅ |
+| C7 | La colección de Postman con los recursos y las consultas nuevas | ✅ |
+
+## Lo que quedó anotado y no se hizo
+
+En `docs/dominio/PENDIENTES.md`, con su razón cada uno. Lo que no se hace
+también se escribe: un pendiente anotado es una decisión; uno no anotado es
+un olvido que alguien va a encontrar en la sustentación.

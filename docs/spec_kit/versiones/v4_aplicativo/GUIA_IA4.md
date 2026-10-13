@@ -48,13 +48,13 @@ Y aparecen tres nuevas, propias de este motor:
 | # | Archivo | Papel |
 |---|---|---|
 | 1 | `docs/spec_kit/1_constitution.md` | Las reglas permanentes |
-| 2 | `.../v4_sqlserver/2_spec.md` | QUÉ construir y los 13 criterios |
-| 3 | `.../v4_sqlserver/3_plan.md` | **La tabla de los tres motores lado a lado** |
-| 4 | `.../v4_sqlserver/4_research.md` | Las decisiones, con lo que se descartó y por qué |
-| 5 | `.../v4_sqlserver/5_data_model.md` | La misma base, en tres dialectos |
-| 6 | `.../v4_sqlserver/6_contracts.md` | Los contratos — que siguen sin moverse |
-| 7 | `.../v4_sqlserver/7_quickstart.md` | El smoke test, con los tres motores |
-| 8 | `.../v4_sqlserver/8_tasks.md` | Las fases, en orden |
+| 2 | `.../v4_aplicativo/2_spec.md` | QUÉ construir y los 13 criterios |
+| 3 | `.../v4_aplicativo/3_plan.md` | **La tabla de los tres motores lado a lado** |
+| 4 | `.../v4_aplicativo/4_research.md` | Las decisiones, con lo que se descartó y por qué |
+| 5 | `.../v4_aplicativo/5_data_model.md` | La misma base, en tres dialectos |
+| 6 | `.../v4_aplicativo/6_contracts.md` | Los contratos — que siguen sin moverse |
+| 7 | `.../v4_aplicativo/7_quickstart.md` | El smoke test, con los tres motores |
+| 8 | `.../v4_aplicativo/8_tasks.md` | Las fases, en orden |
 | 9 | `.../v3_segundo_motor/2_spec.md` | La spec de la v3, para saber qué NO romper |
 
 Y los artefactos **dados**: los tres scripts de base (uno por motor), el
@@ -67,7 +67,7 @@ Y los artefactos **dados**: los tres scripts de base (uno por motor), el
 ### 3.1 La carpeta y las subcarpetas
 
 ```powershell
-mkdir docs\spec_kit\versiones\v4_sqlserver, db\mariadb, db\postgres, db\sqlserver, api_facturas, api_facturas\controladores, api_facturas\excepciones, api_facturas\modelos, api_facturas\pruebas, api_facturas\repositorios, api_facturas\servicios, front_php, front_php\publico, front_php\vistas, pruebas_humo
+mkdir docs\spec_kit\versiones\v4_aplicativo, db\mariadb, db\postgres, db\sqlserver, api_facturas, api_facturas\controladores, api_facturas\excepciones, api_facturas\modelos, api_facturas\pruebas, api_facturas\repositorios, api_facturas\servicios, front_php, front_php\publico, front_php\vistas, pruebas_humo
 ```
 
 ### 3.2 Los archivos VACÍOS
@@ -92,13 +92,13 @@ New-Item .gitattributes, .gitignore, api_facturas\Dockerfile, api_facturas\contr
 | `front_php\publico\bootstrap.min.css` | `front_php\publico\` |
 | `front_php\publico\bootstrap.bundle.min.js` | `front_php\publico\` |
 | `docs\spec_kit\1_constitution.md` | `docs\spec_kit\` |
-| Los `.md` de `docs\spec_kit\versiones\v4_sqlserver\` | la misma ruta |
+| Los `.md` de `docs\spec_kit\versiones\v4_aplicativo\` | la misma ruta |
 
 ### 3.4 Compruebe antes de empezar
 
 - [ ] Los **tres** scripts de base tienen contenido, y `db\sqlserver\init.sh`
       también.
-- [ ] `docs\spec_kit\versiones\v4_sqlserver\` tiene **8 archivos**.
+- [ ] `docs\spec_kit\versiones\v4_aplicativo\` tiene **8 archivos**.
 - [ ] Tiene a mano **el código de la v3**: el criterio 13 se comprueba
       comparando contra él.
 - [ ] **Y tiene internet.** El driver de SQL Server se trae del repositorio de
@@ -198,7 +198,7 @@ Construye la VERSIÓN 4 de este proyecto, partiendo de la versión 3 que ya
 está en esta carpeta y funciona contra MariaDB y PostgreSQL.
 
 Primero lee, bajo docs/spec_kit/: 1_constitution.md y, de
-versiones/v4_sqlserver/, los archivos 2_spec, 3_plan, 4_research,
+versiones/v4_aplicativo/, los archivos 2_spec, 3_plan, 4_research,
 5_data_model, 6_contracts, 7_quickstart y 8_tasks. Lee también
 versiones/v3_segundo_motor/2_spec.md. Después resume en máximo 10 líneas qué
 vas a construir Y QUÉ NO PUEDES TOCAR, y espera mi confirmación.

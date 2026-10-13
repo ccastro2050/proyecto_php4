@@ -1,4 +1,13 @@
-# Proyecto PHP — versión 4: el mismo sistema contra tres motores
+# Proyecto PHP — versión 4: tres motores, el control de acceso y el tablero
+
+> **Qué es esta versión, en una línea.** El sistema de facturas completo
+> —once recursos con su CRUD, diez consultas, control de acceso con token, y
+> un front con todas sus pantallas— corriendo contra **MariaDB, PostgreSQL o
+> SQL Server**, y la elección es una palabra en una variable de entorno.
+>
+> Es la última de la ruta de PHP, y es **equivalente a las otras cuatro v4
+> del semestre**: lo que cambia entre ellas es el stack, no lo que el sistema
+> hace.
 
 Proyecto de curso (ITM). Aquí NO se descarga un sistema terminado:
 **se construye un sistema real por versiones en PHP puro**, guiado por
@@ -209,7 +218,7 @@ Ejecutar la versión del repo es solo el punto de partida. Lo que se evalúa es
 siguiendo las especificaciones — con o sin ayuda de IA:
 
 > 🤖 ¿Va a trabajar con IA? Siga la **[Guía para construir la versión 4 con
-> IA](docs/spec_kit/versiones/v4_sqlserver/GUIA_IA4.md)** — cubre los dos
+> IA](docs/spec_kit/versiones/v4_aplicativo/GUIA_IA4.md)** — cubre los dos
 > caminos con su prompt exacto listo para copiar: **chat web** (Gemini,
 > DeepSeek, ChatGPT: qué archivos subirle) e **IDE agéntico** (Antigravity,
 > Cursor, Claude Code: cómo supervisar al agente).
@@ -342,25 +351,26 @@ propia spec, y una versión está TERMINADA solo cuando pasa sus criterios de
 aceptación (se cierra con tag). Detalle completo:
 **[mapa de versiones](docs/spec_kit/versiones/0_mapa_versiones.md)**.
 
-## 4. Las especificaciones de la versión actual (v1)
+## 4. Las especificaciones de la versión actual (v4)
 
 | Documento | Qué contiene |
 |---|---|
 | [Constitución](docs/spec_kit/1_constitution.md) | Las reglas permanentes del proyecto (PHP puro, capas, un comando) |
-| [2_spec.md](docs/spec_kit/versiones/v4_sqlserver/2_spec.md) | QUÉ construir y los 13 criterios — **incluido el 13, que dice qué NO tocar** |
-| [3_plan.md](docs/spec_kit/versiones/v4_sqlserver/3_plan.md) | CÓMO: el tercer motor, y **la tabla de los tres lado a lado** |
-| [4_research.md](docs/spec_kit/versiones/v4_sqlserver/4_research.md) | Las decisiones y sus alternativas descartadas *(lectura opcional)* |
-| [5_data_model.md](docs/spec_kit/versiones/v4_sqlserver/5_data_model.md) | La misma base, en tres dialectos: en qué se parecen y en qué no |
-| [6_contracts.md](docs/spec_kit/versiones/v4_sqlserver/6_contracts.md) | Los mismos de la v2, por tercera vez — **y que no cambien es el resultado** |
-| [7_quickstart.md](docs/spec_kit/versiones/v4_sqlserver/7_quickstart.md) | Smoke test para validar lo construido |
-| [8_tasks.md](docs/spec_kit/versiones/v4_sqlserver/8_tasks.md) | Las fases de construcción, en orden |
+| [2_spec.md](docs/spec_kit/versiones/v4_aplicativo/2_spec.md) | QUÉ construir y los 13 criterios — **incluido el 13, que dice qué NO tocar** — y el **anexo** con lo que la v4 agregó después del tercer motor: control de acceso, `usuario-con-roles` y las diez consultas |
+| [3_plan.md](docs/spec_kit/versiones/v4_aplicativo/3_plan.md) | CÓMO: el tercer motor, y **la tabla de los tres lado a lado** |
+| [4_research.md](docs/spec_kit/versiones/v4_aplicativo/4_research.md) | Las decisiones y sus alternativas descartadas, y los **seis tropiezos medidos** de la v4 — cuatro de ellos no fallaban: respondían algo razonable y equivocado *(esta parte no es opcional)* |
+| [5_data_model.md](docs/spec_kit/versiones/v4_aplicativo/5_data_model.md) | La misma base, en tres dialectos: en qué se parecen y en qué no |
+| [6_contracts.md](docs/spec_kit/versiones/v4_aplicativo/6_contracts.md) | Los seis de la v2 por tercera vez —**y que no cambien es el resultado**— más los cinco recursos del acceso, `usuario-con-roles` y las diez consultas, con los códigos medidos contra la API en marcha |
+| [7_quickstart.md](docs/spec_kit/versiones/v4_aplicativo/7_quickstart.md) | Prueba de humo en PowerShell, con el 401 contra el 403 y **la demostración de que el permiso no viaja en el token**: quitarle un rol a alguien le cierra la ruta sin cerrarle la sesión |
+| [8_tasks.md](docs/spec_kit/versiones/v4_aplicativo/8_tasks.md) | Las fases de construcción, en orden, y las **tres etapas** que siguieron al tercer motor |
+| [9_checklist.md](docs/spec_kit/versiones/v4_aplicativo/9_checklist.md) | La revisión de los requisitos antes de construir: claridad, medibilidad, completitud, coherencia y alcance |
 
 ## 5. Material conceptual del curso
 
 | Documento | Qué cubre |
 |---|---|
 | [El flujo de una petición](docs/FLUJO_DE_UNA_PETICION.md) | **Léalo primero:** dónde está el GET, dónde se captura el POST, y el viaje completo de una petición por las capas — con los comandos para probar los 5 verbos |
-| [Colección de Postman](postman/README.md) | Los 13 endpoints de la v1 listos para importar y probar con clics — incluida la pareja PUT=422 vs PATCH=200 |
+| [Colección de Postman](postman/README.md) | Los endpoints de la v4 listos para importar y probar con clics: entrar y guardar el token solo, los once recursos, las diez consultas y la pareja PUT=422 vs PATCH=200 |
 | [SDD y Spec Kit](docs/SDD_SPECKIT.md) | La metodología con la que se trabaja este curso: la spec manda sobre el código |
 | [Pruebas y calidad de las pruebas](docs/PRUEBAS_Y_CALIDAD_DE_PRUEBAS.md) | Cobertura, la métrica CRAP y mutation testing: cómo saber si sus pruebas de verdad protegen — y por qué hoy es reto opcional, no alcance del proyecto |
 | [Programación asincrónica](docs/PROGRAMACION_ASINCRONICA.md) | Qué resuelve el async/await en la web, qué se daña sin él (con diagramas), y cómo se ve en el código de este proyecto |

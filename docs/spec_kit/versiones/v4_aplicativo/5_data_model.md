@@ -322,3 +322,105 @@ ejemplo, y a partir de ahí cada una lleva su vida: un cliente creado con
 
 No es un defecto y está declarado en el alcance. Esta versión demuestra que
 **el programa** funciona contra las tres, no que las tres sean la misma.
+
+
+---
+
+# ANEXO A LA v4 — LAS SEIS TABLAS QUE YA ESTABAN, Y LO QUE SE LES AGREGÓ
+
+## 1. No hay una tabla nueva, y eso es el punto
+
+`usuario`, `rol`, `ruta`, `rol_usuario`, `rutarol` **están en el script desde
+la v1**. La v4 no las creó: las encendió. Hasta ahora ningún código las
+nombraba, y una tabla que existe y no se usa es una promesa sin cumplir.
+
+| Tabla | Llave | Qué guarda |
+|---|---|---|
+| `usuario` | `email` | la cuenta y el **hash** de su contraseña |
+| `rol` | `id` | el papel: Administrador, Vendedor, Cajero, Contador, Cliente |
+| `ruta` | `id` | la interfaz a la que se da permiso: `/home`, `/factura`, … |
+| `rol_usuario` | (`fkemail`, `fkidrol`) | **puente**: qué rol tiene cada usuario |
+| `rutarol` | (`fkidruta`, `fkidrol`) | **puente**: qué rol alcanza qué ruta |
+
+El camino del permiso son dos saltos, y los dos son puentes:
+
+```
+usuario --(rol_usuario)--> rol --(rutarol)--> ruta
+```
+
+De ahí que la consulta 8 del tablero —`alcance-de-usuarios`— cruce **cinco**
+tablas: es este camino completo, visto como reporte.
+
+## 2. Por qué las dos llaves son compuestas y no un `id`
+
+Un `id` autoincremental en `rol_usuario` dejaría pasar **la misma pareja dos
+veces**: Juan con el rol 2 dos veces, en dos filas distintas y las dos
+válidas. La llave compuesta lo hace imposible en el motor, no en el código, y
+la consecuencia se ve en el contrato: dar un permiso repetido responde
+**409**, y lo dice la base de datos.
+
+Es también la razón de que esos dos recursos **no tengan PUT ni PATCH**: la
+fila ES su llave. No hay ningún dato que editar.
+
+## 3. La columna de la contraseña: VARCHAR(200), y no 20
+
+Un hash de bcrypt ocupa **60 caracteres** —`$2y$12$` más el salt más el
+digest— y la columna está declarada con 200. No es generosidad: es que el
+costo y la variante van **dentro** del hash, así que el día que el costo
+suba, el texto crece.
+
+Y las contraseñas sembradas están **escritas en la documentación**, con una
+razón que hay que decir en voz alta: **de un hash no se puede volver a la
+clave** —eso es lo que lo hace un hash— y sin la clave no se puede comprobar
+un solo criterio del control de acceso. Hasta octubre de 2026 dos de las ocho
+filas tenían la contraseña en **texto plano** y de las otras cinco nadie
+sabía la clave: el único que podía entrar era `admin`.
+
+Detalle de implementación que se descubrió ahí: `password_verify` devuelve
+`false` ante un hash malformado, **sin lanzar nada**. Así que la API
+respondía «no coincide» en vez de caerse. Ese comportamiento se queda: un
+dato malo en la base de datos no puede tumbar la API.
+
+## 4. Los ocho procedimientos de MariaDB, ahora con transacción
+
+El cambio de esquema más importante de la v4 no es una tabla: es que los ocho
+procedimientos que escriben en más de un sitio ahora abren transacción.
+
+```sql
+DECLARE EXIT HANDLER FOR SQLEXCEPTION
+BEGIN
+    ROLLBACK;
+    RESIGNAL;
+END;
+
+START TRANSACTION;
+...
+COMMIT;
+```
+
+Y aquí está la diferencia entre los tres motores, que es de las que vale
+saber de memoria:
+
+| Motor | Atomicidad de un procedimiento |
+|---|---|
+| **PostgreSQL** | una FUNCIÓN es atómica por definición: si lanza, se deshace todo. No hay que escribir nada |
+| **SQL Server** | `BEGIN TRY` + `BEGIN TRANSACTION` + `ROLLBACK` en el `CATCH`. Hay que escribirlo, y estaba escrito |
+| **MariaDB** | nada por defecto: cada sentencia se confirma sola. **Hay que escribirlo, y no estaba** |
+
+El fallo que lo destapó está medido en `4_research.md`, tropiezo 5: un PATCH
+que respondió 409 y dejó al administrador sin un solo rol.
+
+Los dos procedimientos de `rutarol` quedan **sin** transacción a propósito:
+escriben una fila en una tabla, y una sentencia sola ya es atómica.
+
+## 5. Y una diferencia de dialecto que solo apareció en MariaDB 11
+
+Los parámetros de un procedimiento toman la **colación por defecto del
+servidor** si no se les declara una. MariaDB 11.5 cambió ese defecto a
+`utf8mb4_uca1400_ai_ci`, y las tablas de este proyecto se crean con
+`utf8mb4_unicode_ci`: comparar `u.email = p_email` pasó a ser el **error
+1267**, no una advertencia.
+
+El mismo script funcionaba en MariaDB 10 y reventaba en la 11.8 sin que nadie
+tocara el SQL. Por eso los seis parámetros de correo llevan su colación
+declarada: para que el script valga en las dos versiones.

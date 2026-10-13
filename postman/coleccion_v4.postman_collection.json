@@ -1,10 +1,157 @@
 {
   "info": {
-    "name": "API Facturas v4 (PHP + MariaDB + PostgreSQL + SQL Server)",
-    "description": "LA MISMA COLECCIÓN DE LAS VERSIONES 2 Y 3, y eso es el punto.\n\nLos endpoints no han cambiado en tres versiones. Úsela TRES veces —una por motor— y compare: las respuestas deben ser idénticas, incluidos los textos de los 409.\n\nPara cambiar de motor, en PowerShell:\n    $env:MOTOR = \"sqlserver\"     # o \"postgres\", o \"mariadb\"\n    docker compose up -d --no-deps --force-recreate api-facturas\n\nLa petición «Diagnóstico» dice contra cuál está corriendo. Es el ÚNICO sitio de toda la API donde el motor se menciona.\n\nEMPIECE POR LAS CARPETAS 2 y 3 (empresas y personas): son las tablas de las que las demás dependen.\n\nLas peticiones que terminan en 409 no son errores: son las que demuestran que la integridad la defiende la base y la API la explica en español — con los tres motores, palabra por palabra. Y cada motor las reporta con códigos distintos: dos de los tres usan el mismo código para dos casos opuestos.\n\nContratos: docs/spec_kit/versiones/v4_sqlserver/6_contracts.md",
+    "name": "API Facturas v4 (PHP · MariaDB + PostgreSQL + SQL Server · con control de acceso)",
+    "description": "La API de la v4 entera: los once recursos, las diez consultas y el control de acceso.\n\n**EMPIECE POR LA CARPETA 0.** Desde la v4 la API esta cerrada: solo el diagnostico y `POST /api/sesion` responden sin token. La peticion «1 · Entrar como admin» guarda el token en la variable `token` de la coleccion, y todas las demas lo heredan porque la autenticacion esta puesta en la coleccion —no en cada peticion—.\n\nSi una peticion responde **401**, el token esta vacio o vencio: vuelva a correr la 1. Si responde **403**, el token es valido y a ese usuario no le toca esa ruta: eso no es un error, es la version funcionando.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "0 · ENTRAR (empiece aqui)",
+      "description": "La API esta cerrada desde la v4. Hay exactamente **dos** rutas abiertas, y cada una tiene su razon:\n\n- `GET /` es el diagnostico: un *healthcheck* que necesitara credenciales no serviria de healthcheck, y Docker lo usa para saber si el servicio esta vivo;\n- `POST /api/sesion` es la puerta: no puede exigir el token que ella misma entrega.\n\nCorra la 1 y siga con cualquier otra carpeta.",
+      "item": [
+        {
+          "name": "1 · Entrar como admin",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/sesion",
+            "description": "200 con el token, el correo, los roles y la fecha de vencimiento. El script de prueba guarda el token solo.\n\nVa SIN token (`auth: noauth`): es la puerta.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@correo.com\",\n  \"contrasena\": \"admin123\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Guarda el token en la variable de la COLECCION: las demas peticiones",
+                  "// lo heredan por la autenticacion de la coleccion (Bearer {{token}}).",
+                  "if (pm.response.code === 200) {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token', r.token);",
+                  "    console.log('Token guardado. Entro como ' + r.email +",
+                  "                ' con roles: ' + r.roles.join(', '));",
+                  "} else {",
+                  "    console.log('No se pudo entrar: ' + pm.response.code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 · Quien soy",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/sesion",
+            "description": "El correo y los roles de quien tiene el token. Fijese en que el correo NO va en la URL ni en el cuerpo: sale del token."
+          }
+        },
+        {
+          "name": "3 · Mis permisos",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/permisos/mios",
+            "description": "Las rutas que alcanza quien pregunta. Existe para que el front arme su menu, y para nada mas: la decision de dejar pasar la toma la API en cada peticion."
+          }
+        },
+        {
+          "name": "4 · Renovar el token",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/sesion/renovar",
+            "description": "Un token nuevo para quien ya tiene uno valido. OJO: esta peticion NO actualiza la variable; si quiere seguir con el nuevo, vuelva a correr la 1."
+          }
+        },
+        {
+          "name": "5 · El 401 — sin token",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/producto",
+            "description": "**401.** «No se quien es usted.» Va con `auth: noauth` a proposito, para que se vea la diferencia con la siguiente.",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "6 · Entrar como vendedor1",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/sesion",
+            "description": "El otro token, el que NO alcanza todo. Se guarda en `token_vendedor`.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"vendedor1@correo.com\",\n  \"contrasena\": \"vendedor123\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El token de vendedor1 va a OTRA variable, para poder comparar los dos",
+                  "// sin volver a entrar como administrador.",
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token_vendedor', pm.response.json().token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7 · Entrar con la clave mala",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/sesion",
+            "description": "**401**, y con UN solo mensaje para los dos casos: no dice si fallo el correo o la contrasena. Decir «ese correo no existe» le confirmaria a quien prueba al azar que los demas si existen.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@correo.com\",\n  \"contrasena\": \"no-es-esta\"\n}"
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "8 · Salir",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/sesion",
+            "description": "Es cortesia, y hay que saber por que: **un JWT firmado no se puede apagar desde el servidor** sin una lista negra. Lo que cierra la sesion de verdad es que el cliente tire el token."
+          }
+        }
+      ]
+    },
     {
       "name": "Diagnóstico — GET / (dice el MOTOR activo)",
       "request": {
@@ -18,84 +165,108 @@
       "description": "Los siete endpoints de la v1, tal cual. Que sigan respondiendo igual es el criterio 2 de esta versión: una versión nueva no rompe lo que la anterior prometió.",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/producto",
-          "description": "Listar. 204 si la tabla está vacía."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/producto?limite=3",
-          "description": "El query string en acción."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/producto/PR001",
-          "description": "Obtener uno. 404 si no existe."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/producto",
-          "description": "Crear.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"codigo\": \"PR900\",\n  \"nombre\": \"Producto de prueba\",\n  \"stock\": 10,\n  \"valorunitario\": 50000\n}"
+          "name": "GET /api/producto · listar",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/producto",
+            "description": "Listar. 204 si la tabla está vacía."
           }
         },
         {
-          "method": "PUT",
-          "url": "{{base}}/api/producto/PR900",
-          "description": "Reemplazo COMPLETO: los tres campos.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"nombre\": \"Producto corregido\",\n  \"stock\": 12,\n  \"valorunitario\": 55000\n}"
+          "name": "GET /api/producto?limite=3 · el query string en acción",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/producto?limite=3",
+            "description": "El query string en acción."
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/producto/PR900",
-          "description": "Parcial: solo lo enviado.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"stock\": 7\n}"
+          "name": "GET /api/producto/PR001 · obtener uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/producto/PR001",
+            "description": "Obtener uno. 404 si no existe."
           }
         },
         {
-          "method": "PUT",
-          "url": "{{base}}/api/producto/PR900",
-          "description": "EL CONTRASTE: el MISMO body del PATCH de arriba, en PUT → 422.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "POST /api/producto · crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/producto",
+            "description": "Crear.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"PR900\",\n  \"nombre\": \"Producto de prueba\",\n  \"stock\": 10,\n  \"valorunitario\": 50000\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"stock\": 7\n}"
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/producto/PR900",
-          "description": "Eliminar. Repetirlo da 404."
+          "name": "PUT /api/producto/PR900 · reemplazo COMPLETO: los tres campos",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/producto/PR900",
+            "description": "Reemplazo COMPLETO: los tres campos.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Producto corregido\",\n  \"stock\": 12,\n  \"valorunitario\": 55000\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/producto/PR900 · parcial: solo lo enviado",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/producto/PR900",
+            "description": "Parcial: solo lo enviado.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 7\n}"
+            }
+          }
+        },
+        {
+          "name": "PUT /api/producto/PR900",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/producto/PR900",
+            "description": "EL CONTRASTE: el MISMO body del PATCH de arriba, en PUT → 422.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 7\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/producto/PR900 · eliminar",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/producto/PR900",
+            "description": "Eliminar. Repetirlo da 404."
+          }
         }
       ]
     },
@@ -104,89 +275,116 @@
       "description": "Las compañías a las que puede pertenecer un cliente.\n\nLa llave la escribe quien crea la ficha.",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/empresa",
-          "description": "Listar. 204 si la tabla está vacía."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/empresa?limite=2",
-          "description": "Con límite."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/empresa/E900",
-          "description": "Obtener uno. 404 si no existe."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/empresa",
-          "description": "Crear.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"codigo\": \"E900\",\n  \"nombre\": \"Empresa de prueba\"\n}"
+          "name": "GET /api/empresa · listar",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/empresa",
+            "description": "Listar. 204 si la tabla está vacía."
           }
         },
         {
-          "method": "PUT",
-          "url": "{{base}}/api/empresa/E900",
-          "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"nombre\": \"Empresa de prueba\"\n}"
+          "name": "GET /api/empresa?limite=2 · con límite",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/empresa?limite=2",
+            "description": "Con límite."
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/empresa/E900",
-          "description": "Parcial: solo lo enviado.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"nombre\": \"Empresa renombrada\"\n}"
+          "name": "GET /api/empresa/E900 · obtener uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/empresa/E900",
+            "description": "Obtener uno. 404 si no existe."
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/empresa/E900",
-          "description": "Eliminar."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/empresa",
-          "description": "409 — llave repetida. NO es un 500: la petición está bien escrita, lo que pasa es que ya existe.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "POST /api/empresa · crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/empresa",
+            "description": "Crear.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"E900\",\n  \"nombre\": \"Empresa de prueba\"\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"codigo\": \"E001\",\n  \"nombre\": \"Empresa de prueba\"\n}"
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/empresa/E001",
-          "description": "409 — hay otras fichas que dependen de ésta. La base lo impide, y la API lo explica en español."
+          "name": "PUT /api/empresa/E900",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/empresa/E900",
+            "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empresa de prueba\"\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/empresa/E900 · parcial: solo lo enviado",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/empresa/E900",
+            "description": "Parcial: solo lo enviado.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Empresa renombrada\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/empresa/E900 · eliminar",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/empresa/E900",
+            "description": "Eliminar."
+          }
+        },
+        {
+          "name": "POST /api/empresa · 409 — llave repetida",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/empresa",
+            "description": "409 — llave repetida. NO es un 500: la petición está bien escrita, lo que pasa es que ya existe.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"E001\",\n  \"nombre\": \"Empresa de prueba\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/empresa/E001 · 409 — hay otras fichas que dependen de ésta",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/empresa/E001",
+            "description": "409 — hay otras fichas que dependen de ésta. La base lo impide, y la API lo explica en español."
+          }
         }
       ]
     },
@@ -195,89 +393,116 @@
       "description": "Los datos de contacto de alguien. Una persona no es todavía ni cliente ni vendedor: es el dato de quién es.\n\nLa llave la escribe quien crea la ficha.",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/persona",
-          "description": "Listar. 204 si la tabla está vacía."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/persona?limite=2",
-          "description": "Con límite."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/persona/P900",
-          "description": "Obtener uno. 404 si no existe."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/persona",
-          "description": "Crear.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"codigo\": \"P900\",\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
+          "name": "GET /api/persona · listar",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/persona",
+            "description": "Listar. 204 si la tabla está vacía."
           }
         },
         {
-          "method": "PUT",
-          "url": "{{base}}/api/persona/P900",
-          "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
+          "name": "GET /api/persona?limite=2 · con límite",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/persona?limite=2",
+            "description": "Con límite."
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/persona/P900",
-          "description": "Parcial: solo lo enviado.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"telefono\": \"3009998877\"\n}"
+          "name": "GET /api/persona/P900 · obtener uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/persona/P900",
+            "description": "Obtener uno. 404 si no existe."
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/persona/P900",
-          "description": "Eliminar."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/persona",
-          "description": "409 — llave repetida. NO es un 500: la petición está bien escrita, lo que pasa es que ya existe.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "POST /api/persona · crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/persona",
+            "description": "Crear.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"P900\",\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"codigo\": \"P001\",\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/persona/P001",
-          "description": "409 — hay otras fichas que dependen de ésta. La base lo impide, y la API lo explica en español."
+          "name": "PUT /api/persona/P900",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/persona/P900",
+            "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /api/persona/P900 · parcial: solo lo enviado",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/persona/P900",
+            "description": "Parcial: solo lo enviado.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"3009998877\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/persona/P900 · eliminar",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/persona/P900",
+            "description": "Eliminar."
+          }
+        },
+        {
+          "name": "POST /api/persona · 409 — llave repetida",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/persona",
+            "description": "409 — llave repetida. NO es un 500: la petición está bien escrita, lo que pasa es que ya existe.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"P001\",\n  \"nombre\": \"Persona de prueba\",\n  \"email\": \"prueba@correo.com\",\n  \"telefono\": \"3001112233\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/persona/P001 · 409 — hay otras fichas que dependen de ésta",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/persona/P001",
+            "description": "409 — hay otras fichas que dependen de ésta. La base lo impide, y la API lo explica en español."
+          }
         }
       ]
     },
@@ -286,88 +511,115 @@
       "description": "Una persona que compra. Puede estar asociada a una empresa, o comprar a título propio.\n\nLa llave la genera la base (AUTO_INCREMENT).",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/cliente",
-          "description": "Listar. 204 si la tabla está vacía."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/cliente?limite=2",
-          "description": "Con límite."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/cliente/5",
-          "description": "Obtener uno. 404 si no existe."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/cliente",
-          "description": "Crear. FÍJESE EN QUE EL BODY NO LLEVA `id`: lo genera la base, y la respuesta lo devuelve. Sin eso, quien crea la ficha no tendría cómo volver a pedirla.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"P004\",\n  \"fkcodempresa\": null\n}"
+          "name": "GET /api/cliente · listar",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/cliente",
+            "description": "Listar. 204 si la tabla está vacía."
           }
         },
         {
-          "method": "GET",
-          "url": "{{base}}/api/cliente/abc",
-          "description": "Un identificador que no es un número → 400, no 404. No es que no se haya encontrado: es que eso no es un identificador."
-        },
-        {
-          "method": "PUT",
-          "url": "{{base}}/api/cliente/5",
-          "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"P004\",\n  \"fkcodempresa\": null\n}"
+          "name": "GET /api/cliente?limite=2 · con límite",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/cliente?limite=2",
+            "description": "Con límite."
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/cliente/5",
-          "description": "Parcial: solo lo enviado.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"credito\": 750000\n}"
+          "name": "GET /api/cliente/5 · obtener uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/cliente/5",
+            "description": "Obtener uno. 404 si no existe."
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/cliente/5",
-          "description": "Eliminar."
+          "name": "POST /api/cliente · crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/cliente",
+            "description": "Crear. FÍJESE EN QUE EL BODY NO LLEVA `id`: lo genera la base, y la respuesta lo devuelve. Sin eso, quien crea la ficha no tendría cómo volver a pedirla.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"P004\",\n  \"fkcodempresa\": null\n}"
+            }
+          }
         },
         {
-          "method": "POST",
-          "url": "{{base}}/api/cliente",
-          "description": "409 — apunta a una persona que no existe. La API NO comprobó antes: intentó, y tradujo el veredicto del motor.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "GET /api/cliente/abc",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/cliente/abc",
+            "description": "Un identificador que no es un número → 400, no 404. No es que no se haya encontrado: es que eso no es un identificador."
+          }
+        },
+        {
+          "name": "PUT /api/cliente/5",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/cliente/5",
+            "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"P004\",\n  \"fkcodempresa\": null\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"NOEXISTE\",\n  \"fkcodempresa\": null\n}"
+          }
+        },
+        {
+          "name": "PATCH /api/cliente/5 · parcial: solo lo enviado",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/cliente/5",
+            "description": "Parcial: solo lo enviado.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credito\": 750000\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/cliente/5 · eliminar",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/cliente/5",
+            "description": "Eliminar."
+          }
+        },
+        {
+          "name": "POST /api/cliente · 409 — apunta a una persona que no existe",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/cliente",
+            "description": "409 — apunta a una persona que no existe. La API NO comprobó antes: intentó, y tradujo el veredicto del motor.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credito\": 500000,\n  \"fkcodpersona\": \"NOEXISTE\",\n  \"fkcodempresa\": null\n}"
+            }
           }
         }
       ]
@@ -377,88 +629,115 @@
       "description": "Quien factura. También es una persona, vista desde otro papel.\n\nLa llave la genera la base (AUTO_INCREMENT).",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/vendedor",
-          "description": "Listar. 204 si la tabla está vacía."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/vendedor?limite=2",
-          "description": "Con límite."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/vendedor/4",
-          "description": "Obtener uno. 404 si no existe."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/vendedor",
-          "description": "Crear. FÍJESE EN QUE EL BODY NO LLEVA `id`: lo genera la base, y la respuesta lo devuelve. Sin eso, quien crea la ficha no tendría cómo volver a pedirla.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"P005\"\n}"
+          "name": "GET /api/vendedor · listar",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/vendedor",
+            "description": "Listar. 204 si la tabla está vacía."
           }
         },
         {
-          "method": "GET",
-          "url": "{{base}}/api/vendedor/abc",
-          "description": "Un identificador que no es un número → 400, no 404. No es que no se haya encontrado: es que eso no es un identificador."
-        },
-        {
-          "method": "PUT",
-          "url": "{{base}}/api/vendedor/4",
-          "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"P005\"\n}"
+          "name": "GET /api/vendedor?limite=2 · con límite",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/vendedor?limite=2",
+            "description": "Con límite."
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/vendedor/4",
-          "description": "Parcial: solo lo enviado.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"direccion\": \"Carrera 70 #1-20\"\n}"
+          "name": "GET /api/vendedor/4 · obtener uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/vendedor/4",
+            "description": "Obtener uno. 404 si no existe."
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/vendedor/4",
-          "description": "Eliminar."
+          "name": "POST /api/vendedor · crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/vendedor",
+            "description": "Crear. FÍJESE EN QUE EL BODY NO LLEVA `id`: lo genera la base, y la respuesta lo devuelve. Sin eso, quien crea la ficha no tendría cómo volver a pedirla.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"P005\"\n}"
+            }
+          }
         },
         {
-          "method": "POST",
-          "url": "{{base}}/api/vendedor",
-          "description": "409 — apunta a una persona que no existe. La API NO comprobó antes: intentó, y tradujo el veredicto del motor.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "GET /api/vendedor/abc",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/vendedor/abc",
+            "description": "Un identificador que no es un número → 400, no 404. No es que no se haya encontrado: es que eso no es un identificador."
+          }
+        },
+        {
+          "name": "PUT /api/vendedor/4",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/vendedor/4",
+            "description": "Reemplazo COMPLETO: todos los campos obligatorios.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"P005\"\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"NOEXISTE\"\n}"
+          }
+        },
+        {
+          "name": "PATCH /api/vendedor/4 · parcial: solo lo enviado",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/vendedor/4",
+            "description": "Parcial: solo lo enviado.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direccion\": \"Carrera 70 #1-20\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/vendedor/4 · eliminar",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/vendedor/4",
+            "description": "Eliminar."
+          }
+        },
+        {
+          "name": "POST /api/vendedor · 409 — apunta a una persona que no existe",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/vendedor",
+            "description": "409 — apunta a una persona que no existe. La API NO comprobó antes: intentó, y tradujo el veredicto del motor.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carnet\": 1004,\n  \"direccion\": \"Calle 50 #20-10\",\n  \"fkcodpersona\": \"NOEXISTE\"\n}"
+            }
           }
         }
       ]
@@ -468,119 +747,173 @@
       "description": "Compare esta carpeta con las cinco de arriba antes de usarla.\n\n· NO tiene PATCH: cambiar un renglón cambia el total y el stock, así que el detalle se reemplaza entero.\n· SÍ tiene /anular, que no es eliminar.\n· Y sus respuestas devuelven la factura completa, porque el total lo calculó un trigger y quien la creó no podía saberlo.\n\nSi esta API fuera genérica —una ruta /api/{tabla} con las mismas seis operaciones para todo—, ninguna de las tres cosas habría sido posible.",
       "item": [
         {
-          "method": "GET",
-          "url": "{{base}}/api/factura",
-          "description": "Listar, cada factura con su detalle adentro. `limite` viene en null: este recurso NO acepta ?limite, porque el procedimiento almacenado que lo resuelve no lo recibe."
-        },
-        {
-          "method": "GET",
-          "url": "{{base}}/api/factura/1",
-          "description": "Una factura con su detalle, y con los nombres del cliente y el vendedor (que no son columnas de `factura`: la base los trae con un JOIN)."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/factura",
-          "description": "Crear encabezado y detalle DE UNA VEZ. Anote antes el stock de PR001 y PR003: va a bajar. Y fíjese en el `total` de la respuesta — ese número no lo mandó nadie.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 2\n    },\n    {\n      \"codigo\": \"PR003\",\n      \"cantidad\": 1\n    }\n  ]\n}"
+          "name": "GET /api/factura · listar, cada factura con su detalle adentro",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/factura",
+            "description": "Listar, cada factura con su detalle adentro. `limite` viene en null: este recurso NO acepta ?limite, porque el procedimiento almacenado que lo resuelve no lo recibe."
           }
         },
         {
-          "method": "POST",
-          "url": "{{base}}/api/factura",
-          "description": "422 — sin renglones. Lo rechaza el CONTROLADOR, antes de llegar a la base. El procedimiento también se negaría: son dos defensas a distinta altura.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": []\n}"
+          "name": "GET /api/factura/1",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/factura/1",
+            "description": "Una factura con su detalle, y con los nombres del cliente y el vendedor (que no son columnas de `factura`: la base los trae con un JOIN)."
           }
         },
         {
-          "method": "POST",
-          "url": "{{base}}/api/factura",
-          "description": "422 — un renglón malo. El error dice CUÁL renglón (numerado desde 1) y por qué. «El detalle es inválido» no sirve para corregir nada.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "POST /api/factura · crear encabezado y detalle DE UNA VEZ",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/factura",
+            "description": "Crear encabezado y detalle DE UNA VEZ. Anote antes el stock de PR001 y PR003: va a bajar. Y fíjese en el `total` de la respuesta — ese número no lo mandó nadie.\n\nEl script guarda el numero en `{{num_factura}}`: las peticiones de abajo lo usan, asi que la carpeta se puede correr dos veces sin editar nada.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 2\n    },\n    {\n      \"codigo\": \"PR003\",\n      \"cantidad\": 1\n    }\n  ]\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 2\n    },\n    {\n      \"codigo\": \"\",\n      \"cantidad\": 0\n    }\n  ]\n}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El identificador lo genera la BASE DE DATOS, asi que no se puede",
+                  "// escribir en la coleccion: se guarda aqui y las peticiones",
+                  "// siguientes lo usan como {{num_factura}}.",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const r = pm.response.json();",
+                  "    const valor = r.factura && r.factura.numero;",
+                  "    if (valor !== undefined && valor !== null) {",
+                  "        pm.collectionVariables.set('num_factura', String(valor));",
+                  "        console.log('num_factura = ' + valor);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/factura · 422 — sin renglones",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/factura",
+            "description": "422 — sin renglones. Lo rechaza el CONTROLADOR, antes de llegar a la base. El procedimiento también se negaría: son dos defensas a distinta altura.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": []\n}"
+            }
           }
         },
         {
-          "method": "PUT",
-          "url": "{{base}}/api/factura/7",
-          "description": "Reemplazo COMPLETO: cliente, vendedor y TODO el detalle. Cambie el 7 por el número que le devolvió el POST.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "POST /api/factura · 422 — un renglón malo",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/factura",
+            "description": "422 — un renglón malo. El error dice CUÁL renglón (numerado desde 1) y por qué. «El detalle es inválido» no sirve para corregir nada.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 2\n    },\n    {\n      \"codigo\": \"\",\n      \"cantidad\": 0\n    }\n  ]\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 2,\n  \"fkidvendedor\": 2,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR002\",\n      \"cantidad\": 1\n    }\n  ]\n}"
           }
         },
         {
-          "method": "PATCH",
-          "url": "{{base}}/api/factura/7",
-          "description": "405 — este recurso no admite PATCH. El número 405 no está escrito en ninguna parte del código: sale del enrutador, porque simplemente no hay un `elseif` para PATCH.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "PUT /api/factura/{{num_factura}}",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/factura/{{num_factura}}",
+            "description": "Reemplazo COMPLETO: cliente, vendedor y TODO el detalle. Cambie el 7 por el número que le devolvió el POST.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 2,\n  \"fkidvendedor\": 2,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR002\",\n      \"cantidad\": 1\n    }\n  ]\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 1\n}"
           }
         },
         {
-          "method": "POST",
-          "url": "{{base}}/api/factura/7/anular",
-          "description": "ANULAR. La factura NO se borra: queda marcada y el stock vuelve a los productos. Compruébelo pidiendo GET /api/producto/PR002 antes y después."
-        },
-        {
-          "method": "POST",
-          "url": "{{base}}/api/factura/7/anular",
-          "description": "409 — ya estaba anulada. Lo dice el procedimiento almacenado, no un `if` de PHP."
-        },
-        {
-          "method": "PUT",
-          "url": "{{base}}/api/factura/7",
-          "description": "409 — no se modifica una factura anulada. Una factura anulada es historia.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "PATCH /api/factura/{{num_factura}} · 405 — este recurso no admite PATCH",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/factura/{{num_factura}}",
+            "description": "405 — este recurso no admite PATCH. El número 405 no está escrito en ninguna parte del código: sale del enrutador, porque simplemente no hay un `elseif` para PATCH.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 1\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 1\n    }\n  ]\n}"
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/factura/7",
-          "description": "Esto SÍ la borra, con su detalle (ON DELETE CASCADE). Existe porque en un curso hace falta poder limpiar; en un sistema real probablemente no estaría."
+          "name": "POST /api/factura/{{num_factura}}/anular · aNULAR",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/factura/{{num_factura}}/anular",
+            "description": "ANULAR. La factura NO se borra: queda marcada y el stock vuelve a los productos. Compruébelo pidiendo GET /api/producto/PR002 antes y después."
+          }
+        },
+        {
+          "name": "POST /api/factura/{{num_factura}}/anular · 409 — ya estaba anulada",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/factura/{{num_factura}}/anular",
+            "description": "409 — ya estaba anulada. Lo dice el procedimiento almacenado, no un `if` de PHP."
+          }
+        },
+        {
+          "name": "PUT /api/factura/{{num_factura}} · 409 — no se modifica una factura anulada",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/factura/{{num_factura}}",
+            "description": "409 — no se modifica una factura anulada. Una factura anulada es historia.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidcliente\": 1,\n  \"fkidvendedor\": 1,\n  \"detalle\": [\n    {\n      \"codigo\": \"PR001\",\n      \"cantidad\": 1\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/factura/{{num_factura}}",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/factura/{{num_factura}}",
+            "description": "Esto SÍ la borra, con su detalle (ON DELETE CASCADE). Existe porque en un curso hace falta poder limpiar; en un sistema real probablemente no estaría."
+          }
         }
       ]
     },
@@ -589,34 +922,712 @@
       "description": "Ninguna ruta declara qué verbos NO admite. El 405 aparece solo, porque el enrutador tiene un `else` al final de cada bloque. La lista de verbos que un recurso admite ES la lista de sus `elseif`.",
       "item": [
         {
-          "method": "PUT",
-          "url": "{{base}}/api/cliente",
-          "description": "405 — reemplazar «todos los clientes» no significa nada.",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
+          "name": "PUT /api/cliente",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/cliente",
+            "description": "405 — reemplazar «todos los clientes» no significa nada.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credito\": 1\n}"
             }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"credito\": 1\n}"
           }
         },
         {
-          "method": "DELETE",
-          "url": "{{base}}/api/persona",
-          "description": "405 — borrar la colección entera tampoco."
+          "name": "DELETE /api/persona · 405 — borrar la colección entera tampoco",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/persona",
+            "description": "405 — borrar la colección entera tampoco."
+          }
         },
         {
-          "method": "GET",
-          "url": "{{base}}/api/factura/1/anular",
-          "description": "405 — anular cambia datos: no puede ser un GET."
+          "name": "GET /api/factura/1/anular · 405 — anular cambia datos: no puede ser un GET",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/factura/1/anular",
+            "description": "405 — anular cambia datos: no puede ser un GET."
+          }
         },
         {
-          "method": "GET",
-          "url": "{{base}}/api/inventado",
-          "description": "404 de RUTA — distinto del 404 de «esa ficha no existe», que lo decide el servicio."
+          "name": "GET /api/inventado",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/inventado",
+            "description": "404 de RUTA — distinto del 404 de «esa ficha no existe», que lo decide el servicio."
+          }
+        }
+      ]
+    },
+    {
+      "name": "v4 · El control de acceso (cinco recursos)",
+      "description": "Las cinco tablas del acceso estaban en la base de datos **desde la v1** y ningun codigo las nombraba. La v4 las encendio.\n\nFijese en los dos puentes —`rutarol` y `rol-usuario`—: tienen **dos verbos y no cinco**. Una fila de esas tablas es una pareja de llaves foraneas sin ningun dato propio, asi que «editarla» no significa nada: cambiarle el rol es quitar un permiso y dar otro.",
+      "item": [
+        {
+          "name": "rol · GET lista",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rol",
+            "description": "`{tabla, limite, total, datos}` con los cinco roles."
+          }
+        },
+        {
+          "name": "rol · GET uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rol/1",
+            "description": "La ficha, o 404."
+          }
+        },
+        {
+          "name": "rol · POST crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/rol",
+            "description": "**201.** El id NO va en el cuerpo: lo genera la base de datos.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Auditor\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El identificador lo genera la BASE DE DATOS, asi que no se puede",
+                  "// escribir en la coleccion: se guarda aqui y las peticiones",
+                  "// siguientes lo usan como {{id_rol}}.",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const r = pm.response.json();",
+                  "    const valor = r.datos ? r.datos.id : r.id;",
+                  "    if (valor !== undefined && valor !== null) {",
+                  "        pm.collectionVariables.set('id_rol', String(valor));",
+                  "        console.log('id_rol = ' + valor);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "rol · PUT reemplazar",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/rol/{{id_rol}}",
+            "description": "Cambie el 6 por el id que le haya dado la base de datos.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Auditor interno\"\n}"
+            }
+          }
+        },
+        {
+          "name": "rol · PATCH",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/rol/{{id_rol}}",
+            "description": "Con un solo campo editable, el PUT y el PATCH mandan lo mismo. Siguen separados porque lo que cambia es lo que cada verbo PROMETE.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Auditoria\"\n}"
+            }
+          }
+        },
+        {
+          "name": "rol · DELETE",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/rol/{{id_rol}}",
+            "description": "200, o **409** si hay usuarios o permisos que dependen de el."
+          }
+        },
+        {
+          "name": "ruta · GET lista",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/ruta",
+            "description": "Las 15 rutas declaradas. «Ruta» aqui es una INTERFAZ a la que se da permiso —`/factura`—, no la direccion de una pantalla del front —`/facturas`—."
+          }
+        },
+        {
+          "name": "ruta · POST crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/ruta",
+            "description": "**201.** Una ruta recien creada no le da acceso a nadie hasta que se le asigne un rol: sale en la consulta «interfaces sin usuarios».",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ruta\": \"/reportes\",\n  \"descripcion\": \"Reportes gerenciales\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El identificador lo genera la BASE DE DATOS, asi que no se puede",
+                  "// escribir en la coleccion: se guarda aqui y las peticiones",
+                  "// siguientes lo usan como {{id_ruta}}.",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const r = pm.response.json();",
+                  "    const valor = r.id !== undefined ? r.id : (r.datos && r.datos.id);",
+                  "    if (valor !== undefined && valor !== null) {",
+                  "        pm.collectionVariables.set('id_ruta', String(valor));",
+                  "        console.log('id_ruta = ' + valor);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "usuario · GET lista",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/usuario",
+            "description": "**Y lo que NO devuelve:** la columna de la contrasena existe en la tabla y no sale de aqui. No es que el front la esconda."
+          }
+        },
+        {
+          "name": "usuario · POST crear",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/usuario",
+            "description": "La contrasena viaja en claro por el cuerpo y la API la hashea con bcrypt costo 12 antes de guardarla. Hacer el hash en el front seria peor: el hash pasaria a SER la contrasena.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo.postman@correo.com\",\n  \"contrasena\": \"postman123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "usuario · PATCH la contrasena",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/usuario/nuevo.postman@correo.com",
+            "description": "El mejor ejemplo de PUT contra PATCH del proyecto: el PUT reemplaza correo Y contrasena; el PATCH cambia solo la contrasena, que es lo que uno quiere el 99% de las veces.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasena\": \"otraclave123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "usuario · POST verificar contrasena",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/usuario/verificar-contrasena",
+            "description": "Dice si coincide **sin** entregar un token: sirve para pedir confirmacion antes de una operacion delicada.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo.postman@correo.com\",\n  \"contrasena\": \"otraclave123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "usuario · DELETE",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/usuario/nuevo.postman@correo.com",
+            "description": "200, o 404."
+          }
+        },
+        {
+          "name": "rutarol · GET lista",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rutarol",
+            "description": "Los permisos, con los nombres ya resueltos: `{fkidruta, ruta, fkidrol, rol}`."
+          }
+        },
+        {
+          "name": "rutarol · GET por ruta",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rutarol/ruta/4",
+            "description": "Los roles que alcanzan esa ruta. Esta busqueda por lado no existe en ningun otro recurso."
+          }
+        },
+        {
+          "name": "rutarol · GET por rol",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rutarol/rol/2",
+            "description": "Las rutas que alcanza ese rol."
+          }
+        },
+        {
+          "name": "rutarol · POST dar permiso (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/rutarol",
+            "description": "**201.** Le da el rol Cliente a la ruta que creo «ruta · POST crear», no a una sembrada.\n\n**Por que la ruta es `{{id_ruta}}` y no un numero:** la primera version de esta peticion usaba la pareja (1, 5) —`/home` para el rol Cliente—, **que esta sembrada**. El POST respondia 409 y el DELETE de abajo borraba una fila de la siembra: al correr la coleccion dos veces, `cliente1` se quedaba sin `/home` y nadie entendia por que. Se midio y se corrigio.\n\nUna coleccion de pruebas **no puede borrar datos sembrados**. Trabaja sobre la ruta que ella misma crea.\n\n**Y fijese en que la variable va SIN comillas** en el cuerpo: `\"fkidruta\": {{id_ruta}}`. Con comillas, Postman manda el texto `\"19\"` y la API responde **422**: pide un entero. Se midio — el 422 salio en la primera corrida—. Una variable de Postman siempre es texto; las comillas del JSON son las que deciden si llega como numero.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidruta\": {{id_ruta}},\n  \"fkidrol\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "rutarol · POST el MISMO permiso → 409",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/rutarol",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkidruta\": {{id_ruta}},\n  \"fkidrol\": 5\n}"
+            },
+            "description": "**409.** La llave primaria de esta tabla es la pareja entera, asi que lo impide el MOTOR y no el codigo: dar dos veces el mismo permiso no significa nada.\n\n**Y fijese en que la variable va SIN comillas** en el cuerpo: `\"fkidruta\": {{id_ruta}}`. Con comillas, Postman manda el texto `\"19\"` y la API responde **422**: pide un entero. Se midio — el 422 salio en la primera corrida—. Una variable de Postman siempre es texto; las comillas del JSON son las que deciden si llega como numero."
+          }
+        },
+        {
+          "name": "rutarol · DELETE quitar (la pareja entera es la llave)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/rutarol/{{id_ruta}}/5",
+            "description": "**La pareja entera es la llave**, y va en la direccion: `/api/rutarol/{idRuta}/{idRol}`. Quita el permiso que crearon las dos peticiones de arriba, para que la ruta se pueda borrar al final."
+          }
+        },
+        {
+          "name": "rol-usuario · GET lista",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rol-usuario",
+            "description": "Que rol tiene cada usuario."
+          }
+        },
+        {
+          "name": "rol-usuario · GET los roles de uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/rol-usuario/usuario/vendedor1@correo.com",
+            "description": "Vendedor y Cajero. Guarde este dato para la carpeta del 403."
+          }
+        },
+        {
+          "name": "rol-usuario · POST dar rol",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/rol-usuario",
+            "description": "Dar un rol a un usuario.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkemail\": \"cliente1@correo.com\",\n  \"fkidrol\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "rol-usuario · DELETE quitar rol",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/rol-usuario/cliente1%40correo.com/2",
+            "description": "El correo va codificado: `%40` es la arroba."
+          }
+        },
+        {
+          "name": "ruta · DELETE (limpia lo que creo esta carpeta)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/ruta/{{id_ruta}}",
+            "description": "Borra la ruta que creo «ruta · POST crear». Va al final a proposito: **una coleccion que se puede correr dos veces es una coleccion que limpia lo que crea.** Si no lo hiciera, la segunda corrida respondaria 409 y parecera que algo se rompio."
+          }
+        }
+      ]
+    },
+    {
+      "name": "v4 · usuario-con-roles (dos tablas, una peticion)",
+      "description": "El recurso que estrena la v4: crea el usuario **y** le da sus roles en una sola peticion, con un procedimiento almacenado que abre transaccion.\n\n**La peticion que hay que mirar es la del rol inexistente.** Responde 409, y despues conviene pedir la ficha: el usuario NO se queda sin roles. No siempre fue asi — en MariaDB los procedimientos no tenian transaccion, y un PATCH fallido dejo al administrador con cero roles.",
+      "item": [
+        {
+          "name": "GET lista (una consulta, no N+1)",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/usuario-con-roles",
+            "description": "Cada usuario con su lista de roles ya armada. Pedir los usuarios y luego un viaje por cada uno daria el mismo resultado y ocho veces el trabajo."
+          }
+        },
+        {
+          "name": "GET uno",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/usuario-con-roles/jefe@correo.com",
+            "description": "Administrador, Cajero y Contador."
+          }
+        },
+        {
+          "name": "POST crear con dos roles",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/usuario-con-roles",
+            "description": "**201** con el usuario y sus roles.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ucr.postman@correo.com\",\n  \"contrasena\": \"postman123\",\n  \"roles\": [\n    2,\n    3\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "PUT reemplazar clave y roles",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/usuario-con-roles/ucr.postman@correo.com",
+            "description": "Contrasena vacia = no se toca. Es la convencion del procedimiento, y el repositorio la respeta en vez de inventar otra.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasena\": \"otraclave123\",\n  \"roles\": [\n    3,\n    4\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH solo los roles",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/usuario-con-roles/ucr.postman@correo.com",
+            "description": "Lo que llegue, nada mas.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    1\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH con un rol que NO existe → 409",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/usuario-con-roles/ucr.postman@correo.com",
+            "description": "**409**, y aqui esta la prueba de la transaccion: corra despues el «GET uno» de este mismo usuario y vera que conserva el rol que tenia. El procedimiento borra los roles antes de insertar los nuevos; sin transaccion, este 409 dejaria al usuario con CERO roles.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"roles\": [\n    99\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "GET uno otra vez (conserva sus roles)",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/usuario-con-roles/ucr.postman@correo.com",
+            "description": "Despues del 409 de arriba: sigue con el rol 1. Eso es el ROLLBACK."
+          }
+        },
+        {
+          "name": "DELETE (el usuario y sus roles)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/usuario-con-roles/ucr.postman@correo.com",
+            "description": "200 con el detalle de lo borrado: aqui se borraron filas de DOS tablas, y decirlo es informacion util."
+          }
+        }
+      ]
+    },
+    {
+      "name": "v4 · Las diez consultas",
+      "description": "Diez preguntas que **ningun endpoint del CRUD puede responder**, porque el CRUD mira una tabla a la vez y cada una de estas cruza cuatro o mas.\n\nTodas son **GET**: una consulta no cambia nada. Y el sobre es otro —`{consulta, total, datos}`—, porque `tabla` seria falso y `limite` no aplica: un reporte se devuelve entero o no sirve para sumar.\n\nLas diez piden el permiso `/home`, que hoy tienen los cinco roles.\n\n**Tres de las diez pueden responder `total: 0`** con los datos sembrados: preguntan por lo que no existe.",
+      "item": [
+        {
+          "name": "1 · ventas-por-producto",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ventas-por-producto",
+            "description": "Que se vende y cuanto deja. Cruza producto, el renglon del detalle, la factura y el cliente."
+          }
+        },
+        {
+          "name": "2 · ventas-por-cliente",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ventas-por-cliente",
+            "description": "Quien compra y cuanto. El nombre del cliente NO esta en `cliente`: esta en `persona`, y de ahi el JOIN."
+          }
+        },
+        {
+          "name": "3 · ventas-por-vendedor",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ventas-por-vendedor",
+            "description": "La imagen en espejo de la anterior, por el otro lado de la factura."
+          }
+        },
+        {
+          "name": "4 · ventas-por-empresa",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ventas-por-empresa",
+            "description": "Cuanto factura cada empresa. Aqui el INNER JOIN es correcto a proposito."
+          }
+        },
+        {
+          "name": "5 · ticket-por-vendedor",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ticket-por-vendedor",
+            "description": "Cuanto vale en promedio una factura de cada vendedor. Es la unica que se escribe distinto en SQL Server, y la razon que llevaba cuatro repos escrita era FALSA: ver `4_research.md`."
+          }
+        },
+        {
+          "name": "6 · productos-sin-vender",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/productos-sin-vender",
+            "description": "Lo que NO se ha vendido. Puede responder 0 filas, y no es un error. Es LEFT JOIN + HAVING COUNT = 0: con INNER JOIN estos productos no apareceran nunca."
+          }
+        },
+        {
+          "name": "7 · anulaciones-por-cliente",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/anulaciones-por-cliente",
+            "description": "Quien anula y por cuanto. Puede responder 0 filas. Y ensena algo del diseno: al anular, la factura no se borra, cambia de estado."
+          }
+        },
+        {
+          "name": "8 · alcance-de-usuarios",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/alcance-de-usuarios",
+            "description": "A cuantas interfaces llega cada usuario. CINCO tablas: es el camino completo del control de acceso visto como reporte."
+          }
+        },
+        {
+          "name": "9 · interfaces-sin-usuarios",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/interfaces-sin-usuarios",
+            "description": "Rutas declaradas a las que no llega nadie. Puede responder 0 filas."
+          }
+        },
+        {
+          "name": "10 · credito-contra-consumo",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/credito-contra-consumo",
+            "description": "Credito, consumido y disponible. El LEFT JOIN a `empresa` es el que importa: con INNER JOIN desaparecerian los clientes que compran a nombre propio."
+          }
+        },
+        {
+          "name": "El indice de las diez",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas",
+            "description": "Para que el front no las tenga escritas a mano: dos listas que hay que acordarse de cambiar a la vez son una lista de mas."
+          }
+        },
+        {
+          "name": "POST a una consulta → 405",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/consultas/ventas-por-producto",
+            "description": "**405.** Una consulta no tiene nada que crear ni que borrar. `DELETE /api/consultas/ventas-por-producto` no significa nada: ¿borrar que, las ventas?",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "v4 · El 401 y el 403 (corra la 6 de la carpeta 0 primero)",
+      "description": "**Antes de esta carpeta corra «6 · Entrar como vendedor1»**, que guarda su token en `token_vendedor`.\n\nLas peticiones de aqui usan ESE token a proposito. `vendedor1` tiene dos roles —Vendedor y Cajero— y alcanza tres rutas: `/home`, `/factura` y `/cliente`.\n\n401 es «no se quien es usted». 403 es «se quien es y no le toca». Son dos problemas distintos y por eso son dos respuestas distintas.",
+      "item": [
+        {
+          "name": "vendedor1 · /api/factura → 200",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/factura",
+            "description": "Lo alcanza por sus dos roles.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vendedor}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "vendedor1 · /api/usuario → 403",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/usuario",
+            "description": "**403.** Administrar usuarios no le toca. Y esto no depende del front: aqui no hay front.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vendedor}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "vendedor1 · /api/consultas/ventas-por-producto → 200",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/consultas/ventas-por-producto",
+            "description": "Las diez consultas piden `/home`, y eso si lo tiene.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vendedor}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin le quita el rol de Vendedor",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/rol-usuario/vendedor1%40correo.com/2",
+            "description": "Esta va con el token del ADMINISTRADOR. Y ahora viene la prueba: la siguiente peticion usa el token de vendedor1 **que ya estaba emitido**, sin volver a entrar."
+          }
+        },
+        {
+          "name": "vendedor1 · /api/cliente → 403 (¡con el MISMO token!)",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/cliente",
+            "description": "**403**, y el token no cambio ni vencio.\n\nEso es lo que significa que el permiso NO viaje dentro del token: se consulta en la base de datos en CADA peticion. Si viajara dentro, quitarle el rol no tendria efecto hasta que su token venciera.\n\n`/api/factura` sigue respondiendo 200, porque eso lo da tambien el rol de Cajero: **los permisos de los roles se suman**.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token_vendedor}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "admin le devuelve el rol",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/rol-usuario",
+            "description": "**201**: dar un rol es crear una fila en la tabla puente, y por eso responde «creado» y no «actualizado».\n\nDeja la base de datos como estaba. Despues de esta, `/api/cliente` con el token de vendedor1 vuelve a responder 200 — **sin reentrar**, que es justo lo que esta carpeta demuestra.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fkemail\": \"vendedor1@correo.com\",\n  \"fkidrol\": 2\n}"
+            }
+          }
         }
       ]
     }
@@ -626,6 +1637,41 @@
       "key": "base",
       "value": "http://localhost:8090",
       "description": "La URL base de la API. Proyecto del curso: 8090 · SU reconstrucción: 8190. El puerto NO cambia con el motor: es el mismo programa."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "Lo llena solo la peticion «1 · Entrar como admin». No se escribe a mano."
+    },
+    {
+      "key": "token_vendedor",
+      "value": "",
+      "description": "El token de vendedor1, para probar el 403."
+    },
+    {
+      "key": "num_factura",
+      "value": "",
+      "description": "El numero de la ultima factura creada. Lo llena el script de «POST /api/factura · crear». No se escribe a mano: lo genera la base de datos."
+    },
+    {
+      "key": "id_rol",
+      "value": "",
+      "description": "El id del rol creado por «rol · POST crear». Igual que el anterior: lo genera la base de datos."
+    },
+    {
+      "key": "id_ruta",
+      "value": "",
+      "description": "El id de la ruta creada por «ruta · POST crear»."
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  }
 }

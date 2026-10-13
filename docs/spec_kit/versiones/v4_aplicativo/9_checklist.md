@@ -142,3 +142,87 @@
 > Si el veredicto es rojo, anote aquí qué documento hay que corregir y por
 > qué. Esa nota es la que evita repetir el mismo error en la versión
 > siguiente.
+
+
+---
+
+# ANEXO A LA v4 — LA REVISIÓN DE LOS REQUISITOS QUE SE AGREGARON
+
+Los requisitos del aplicativo pasaron por la misma revisión que los del
+tercer motor, y conviene dejar escritas las **tres** correcciones que salieron
+de ella, porque las tres son del tipo que uno no ve en su propio texto.
+
+## A. Claridad — ¿dice UNA sola cosa?
+
+| Requisito como se escribió primero | Qué le faltaba | Como quedó |
+|---|---|---|
+| «la API valida que el usuario tenga permiso» | *Validar* no dice qué responde, y aquí hay **dos** respuestas distintas | «sin token: 401; con token y sin permiso: 403» |
+| «el front oculta lo que el usuario no puede ver» | Suena a control de acceso y **no lo es** | «el front no ofrece lo que la API va a rechazar; la API niega aunque el front ofrezca» |
+| «crear un usuario con sus roles en una operación» | No decía qué pasa si falla a mitad | «…y es atómica: si un rol no existe, no queda el usuario creado sin roles» |
+
+El segundo es el importante. Escrito como estaba, un estudiante podría
+«cumplirlo» escondiendo botones y dejando la API abierta. **Un requisito que
+se puede cumplir mal está mal escrito.**
+
+## B. Medible — ¿se puede verificar?
+
+| Criterio | Cómo se mide, exactamente |
+|---|---|
+| El permiso no está en el token | Quitar un rol con el token ya emitido y repetir **la misma** petición: 200 → 403, sin reentrar |
+| Los permisos de los roles se suman | `vendedor1` tiene dos roles; quitarle uno **no** le cierra `/factura`, que el otro también da |
+| Las diez consultas valen en los tres motores | `prueba_consultas_tres_motores.php`, que compara **columnas** y **valores**, no códigos de respuesta |
+| El `ticket_promedio` no se trunca | La misma prueba lo recalcula como `total / facturas` y lo compara con 2 decimales |
+| La operación es atómica | Mandar un rol inexistente y **mirar la base de datos**, no la respuesta |
+
+Los dos últimos son los que de verdad justifican el anexo: **cuatro de los
+seis tropiezos de esta versión no fallaban.** Un criterio que solo mira el
+código de respuesta los habría dado por buenos.
+
+## C. Completitud — ¿falta algo?
+
+Lo que la revisión encontró que faltaba, y entró:
+
+- qué pasa con una ruta **no declarada** en la tabla `ruta` → fallar cerrado;
+- qué pasa con un usuario **sin ningún rol** → entra (la contraseña es
+  correcta) y no alcanza nada: 401 no, 403 en todo;
+- qué devuelve una consulta **sin filas** → `total: 0`, y no es un error;
+- y qué **no** se hace: la lista negra de tokens, el bloqueo por intentos
+  fallidos y el registro de auditoría. Están en
+  `docs/dominio/PENDIENTES.md`, con su razón cada uno. **Lo que no se hace
+  también se escribe**: un pendiente anotado es una decisión; uno no anotado
+  es un olvido que alguien encuentra en la sustentación.
+
+## D. Coherencia — ¿los documentos dicen lo mismo?
+
+Aquí salió la corrección más grande, y no era de esta versión: el mapa de
+versiones decía que el control de acceso **no** entraba en la ruta de PHP
+—«seis tablas que ningún código nombra»— y el repositorio de consultas de
+SQL Server explicaba el `CAST` con una afirmación falsa que llevaba cuatro
+repos copiándose.
+
+Las dos están corregidas, y **las dos quedan contadas** en lugar de
+reescritas en silencio: `0_mapa_versiones.md` dice qué decía antes y por qué
+cambió, y `4_research.md` dice cómo se cayó la explicación del CAST. Un
+estudiante que lea las dos versiones aprende más que uno que lea solo la
+segunda.
+
+## E. Alcance — ¿no se está anticipando?
+
+Lo que **no** entró, teniéndolo a mano:
+
+- **refrescar el token automáticamente** desde el front: hay
+  `POST /api/sesion/renovar` y el front no lo llama. Cuando el token vence,
+  la siguiente petición responde 401 y el front manda a `/entrar`. Es
+  honesto y es suficiente para un proyecto de aula;
+- **paginar las consultas**: un reporte se devuelve entero o no sirve para
+  sumar;
+- **permisos por verbo** (que un rol pueda leer y no escribir): la tabla
+  `ruta` guarda la ruta, no el método. Cambiarlo es cambiar el modelo, y eso
+  es una decisión mayor que no se toma en un anexo.
+
+## Resultado
+
+Los requisitos del aplicativo quedan **aprobados con las tres correcciones de
+la sección A aplicadas**, y con los cinco criterios de la sección B escritos
+de forma que se puedan volver a correr. Lo que no se hizo está anotado donde
+se anota.

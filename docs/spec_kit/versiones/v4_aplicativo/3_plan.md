@@ -237,3 +237,102 @@ el producto se escriba «SQL Server».
 **Complejidad justificada:** dos desviaciones conscientes, las dos declaradas
 y aisladas — depender del texto de un mensaje para distinguir casos (ahora en
 dos de los tres motores), y las credenciales distintas de SQL Server.
+
+
+---
+
+# ANEXO A LA v4 — CÓMO SE CONSTRUYÓ EL APLICATIVO
+
+## 1. El orden, que no fue casual
+
+Primero **los cinco recursos** del acceso, después **la puerta**, y al final
+**las consultas**. Cerrar la API antes de tener los recursos habría obligado
+a probar cada uno con token desde el primer día, y los fallos de las dos
+cosas se habrían confundido: un 403 inesperado puede ser un permiso mal dado
+o un repositorio mal escrito, y separarlos cuesta horas.
+
+## 2. Las piezas nuevas, y dónde entra cada una
+
+| Capa | Qué se agregó |
+|---|---|
+| `modelos/` | `Rol`, `Ruta`, `Usuario` |
+| `repositorios/` | 8 interfaces × 3 motores, más los traductores de error que ya existían |
+| `servicios/` | 8 servicios con su interfaz, y el **ensamblador** con 8 `match` más |
+| `autorizacion/` | **nueva carpeta**: `jwt.php` y `guardia.php` |
+| `controladores/` | 8 controladores más, uno por recurso |
+| `index.php` | la lista blanca, **una** llamada a la guardia, y el mapa de permisos |
+| `pruebas/` | `prueba_consultas_tres_motores.php` |
+
+**La carpeta `autorizacion/` es la única pieza nueva de la arquitectura**, y
+está aparte a propósito: no es un repositorio —no habla con la base de
+datos—, no es un servicio —no tiene regla de negocio— y no es un controlador
+—no atiende una ruta—. Es la aduana: mira la cabecera, pregunta por el
+permiso y deja pasar o responde. Meterla en cualquiera de las tres carpetas
+existentes habría sido meterla donde no es.
+
+## 3. El JWT, a mano y sin librería
+
+Este proyecto no usa Composer, así que el token se firma con tres funciones
+propias: `jwt_base64_codificar`, `jwt_firmar` y `jwt_leer`. Son sesenta
+líneas, y enseñan lo que una librería esconde:
+
+- **base64url** no es base64: cambia `+` y `/` por `-` y `_` y quita el
+  relleno `=`, porque los tres primeros significan algo en una URL;
+- la firma es `hash_hmac('sha256', ...)` sobre la cabecera y el contenido ya
+  codificados, **en ese orden y con el punto en medio**;
+- y la comparación se hace con **`hash_equals`** y no con `===`. La razón es
+  fina y es real: `===` para en el primer byte distinto, así que el tiempo
+  que tarda revela cuántos bytes acertó quien está probando. `hash_equals`
+  tarda lo mismo siempre. Es un **ataque de tiempo**, y la defensa es una
+  función.
+
+Lo que NO se hizo a mano es el hash de las contraseñas: ahí está
+`password_hash` de PHP, que es la librería del propio lenguaje. La diferencia
+es deliberada: el JWT se escribe para que se vea por dentro, y una contraseña
+no se experimenta.
+
+## 4. La guardia: una llamada, no veinte
+
+En .NET la guardia es un atributo sobre la clase del controlador y protege
+todos sus métodos, **incluido el que alguien escriba mañana**. En PHP puro no
+hay framework que haga eso, y copiar la llamada en cada bloque del enrutador
+—veintitantos— sería dejar veintitantas oportunidades de olvidarla.
+
+Así que se hizo al revés: **una lista blanca de dos rutas y una sola llamada
+arriba de todo**. Para dejar un endpoint abierto por accidente habría que
+agregarlo a la lista blanca, y eso se ve en el `diff`.
+
+```php
+if (!in_array($ruta, RUTAS_ABIERTAS, true)) {
+    $recurso = explode('/', trim($ruta, '/'))[1] ?? '';
+    if (isset(PERMISO_POR_RECURSO[$recurso])) {
+        exigirPermiso(PERMISO_POR_RECURSO[$recurso]);
+    } else {
+        exigirSesion();
+    }
+}
+```
+
+El `else` es la otra mitad: una ruta que no está en el mapa de permisos
+**exige al menos sesión**. Si no existe, el 404 del final la atiende, pero no
+sin identificarse. **Fallar cerrado** es que lo que no está declarado no
+pase.
+
+Y tres recursos comparten el permiso `/usuario` —`usuario`, `rol-usuario` y
+`usuario-con-roles`—, porque administrar usuarios es **un** permiso aunque
+sean tres recursos. Si cada uno pidiera el suyo, dar de alta a alguien
+exigiría tres permisos y nadie se acordaría de los tres.
+
+## 5. Las consultas: sin procedimientos, y con el SQL a la vista
+
+Los procedimientos almacenados de este proyecto están donde hay una **regla
+que proteger** —la facturación, el usuario con sus roles: transacciones—, no
+donde solo hay un SELECT. Una consulta de reporte cambia cada vez que alguien
+quiere verla de otra forma, y tenerla en un procedimiento obliga a tocar la
+base de datos para cambiar un `ORDER BY`.
+
+Las diez están escritas en los tres repositorios con `query()` y **sin
+`prepare`**, porque no reciben un solo dato de fuera. Eso está comentado en
+los tres archivos, y es el criterio del proyecto entero: **el `prepare` no es
+un adorno de estilo, es la defensa contra la inyección de SQL**, y va donde
+entra un dato ajeno.

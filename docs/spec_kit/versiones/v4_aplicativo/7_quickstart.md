@@ -175,3 +175,198 @@ cero, y eso tarda más que los otros dos: déle su minuto y revise
 | Todo funciona en dos motores y falla en el tercero | **Eso es el hallazgo.** Busque el SQL, el nombre de procedimiento o el código de error que quedó fuera de una clase con apellido de motor |
 | Puertos 8088, 8090, 8104, 13329, 15465 u 11474 ocupados | Otro proyecto del curso está corriendo — apáguelo |
 | `all predefined address pools have been fully subnetted` | Docker se quedó sin rangos de red: `docker network prune -f`, y apague los proyectos que no esté usando. Con seis servicios, éste es el proyecto más pesado de la ruta |
+
+
+---
+
+# ANEXO A LA v4 — PROBAR EL CONTROL DE ACCESO Y LAS CONSULTAS
+
+Todo esto es PowerShell, y con `Invoke-RestMethod`: en PowerShell `curl` es
+un alias de `Invoke-WebRequest` y **no acepta las banderas de curl**, así que
+un `curl -X POST -d ...` copiado de internet falla con un mensaje que no
+ayuda.
+
+## 1. Entrar y guardar el token
+
+```powershell
+$r = Invoke-RestMethod -Method Post -Uri http://localhost:8090/api/sesion `
+     -ContentType 'application/json' `
+     -Body '{"email":"admin@correo.com","contrasena":"admin123"}'
+
+$cab = @{ Authorization = "Bearer $($r.token)" }
+$r.roles       # Administrador
+$r.expira      # cuando vence
+```
+
+Las tres cuentas que importan, y las contraseñas están escritas a propósito
+—de un hash no se vuelve a la clave, y sin la clave no se comprueba nada—:
+
+| Correo | Contraseña | Alcanza |
+|---|---|---|
+| `admin@correo.com` | `admin123` | las 15 rutas |
+| `vendedor1@correo.com` | `vendedor123` | `/home`, `/factura`, `/cliente` |
+| `cliente1@correo.com` | `cliente123` | `/home` y `/producto` |
+
+## 2. Ver el 401 y el 403, que son distintos
+
+```powershell
+# Sin cabecera: 401, "no sé quién es usted"
+Invoke-RestMethod http://localhost:8090/api/producto
+
+# Con el token de vendedor1: 403, "sé quién es y no le toca"
+$v = Invoke-RestMethod -Method Post -Uri http://localhost:8090/api/sesion `
+     -ContentType 'application/json' `
+     -Body '{"email":"vendedor1@correo.com","contrasena":"vendedor123"}'
+$cv = @{ Authorization = "Bearer $($v.token)" }
+
+Invoke-RestMethod -Headers $cv http://localhost:8090/api/factura   # 200
+Invoke-RestMethod -Headers $cv http://localhost:8090/api/usuario   # 403
+```
+
+## 3. La prueba que de verdad enseña: el permiso no está en el token
+
+Con el token de `vendedor1` ya en la mano, **quítele el rol y no toque el
+token**. Y hay que escoger bien la ruta, porque este paso falla si se escoge
+mal —a mí me falló al escribirlo—: `vendedor1` tiene **dos** roles, Vendedor
+y Cajero, y `/factura` lo dan los dos. Quitarle uno no le cierra nada.
+
+Mire primero quién da qué:
+
+```powershell
+(Invoke-RestMethod -Headers $cab "http://localhost:8090/api/rutarol?limite=100").datos |
+  Where-Object { $_.ruta -in '/factura','/cliente' } |
+  Select-Object ruta, rol | Sort-Object ruta
+```
+
+| Ruta | La dan |
+|---|---|
+| `/factura` | Administrador, Cajero, **Vendedor** |
+| `/cliente` | Administrador, Contador, **Vendedor** |
+
+Así que la ruta de la demostración es **`/cliente`**: de los dos roles de
+`vendedor1`, solo Vendedor la da.
+
+```powershell
+# 1. Ahora pasa
+Invoke-RestMethod -Headers $cv http://localhost:8090/api/cliente     # 200
+
+# 2. El administrador le quita el rol de Vendedor (id 2)
+Invoke-RestMethod -Method Delete -Headers $cab `
+  "http://localhost:8090/api/rol-usuario/vendedor1%40correo.com/2"
+
+# 3. EL MISMO token de antes, la MISMA petición
+Invoke-RestMethod -Headers $cv http://localhost:8090/api/cliente     # 403
+#    detalle: "El usuario vendedor1@correo.com no tiene acceso a /cliente."
+
+# 4. Y /factura sigue abierta, porque eso lo da Cajero
+Invoke-RestMethod -Headers $cv http://localhost:8090/api/factura     # 200
+```
+
+Pasó de 200 a 403 **sin que el token cambiara ni venciera**, porque el
+permiso se consulta en la base de datos en cada petición. Si el permiso
+viajara dentro del token, el cambio no se notaría hasta que venciera.
+
+Y el paso 4 enseña la otra mitad, que es igual de importante: **los permisos
+de los roles se suman.** Quien tiene dos roles alcanza la unión de sus rutas,
+así que cerrarle una exige quitarle TODOS los roles que la dan. Por eso la
+consulta `alcance-de-usuarios` del tablero existe: dice a cuántas interfaces
+llega cada quien, ya sumadas.
+
+Y para dejarlo como estaba:
+
+```powershell
+Invoke-RestMethod -Method Post -Headers $cab -ContentType 'application/json' `
+  -Uri http://localhost:8090/api/rol-usuario `
+  -Body '{"fkemail":"vendedor1@correo.com","fkidrol":2}'
+```
+
+## 4. El usuario con sus roles, y la transacción
+
+```powershell
+# Crear con dos roles, en UNA petición
+Invoke-RestMethod -Method Post -Headers $cab -ContentType 'application/json' `
+  -Uri http://localhost:8090/api/usuario-con-roles `
+  -Body '{"email":"prueba@correo.com","contrasena":"prueba123","roles":[2,3]}'
+
+# Y ahora el que importa: un rol que NO existe
+Invoke-RestMethod -Method Patch -Headers $cab -ContentType 'application/json' `
+  -Uri http://localhost:8090/api/usuario-con-roles/prueba@correo.com `
+  -Body '{"roles":[99]}'
+# -> 409
+
+# ¿Se quedó sin roles?
+Invoke-RestMethod -Headers $cab `
+  http://localhost:8090/api/usuario-con-roles/prueba@correo.com
+# -> sigue con Vendedor y Cajero: el procedimiento deshizo el DELETE
+
+# Limpiar
+Invoke-RestMethod -Method Delete -Headers $cab `
+  http://localhost:8090/api/usuario-con-roles/prueba@correo.com
+```
+
+## 5. Las diez consultas
+
+```powershell
+# El índice
+(Invoke-RestMethod -Headers $cab http://localhost:8090/api/consultas).datos
+
+# Una cualquiera
+$c = Invoke-RestMethod -Headers $cab `
+     http://localhost:8090/api/consultas/ventas-por-producto
+$c.total
+$c.datos | Format-Table
+
+# Y las diez de un tirón
+'ventas-por-producto','ventas-por-cliente','ventas-por-vendedor',
+'ventas-por-empresa','ticket-por-vendedor','productos-sin-vender',
+'anulaciones-por-cliente','alcance-de-usuarios','interfaces-sin-usuarios',
+'credito-contra-consumo' | ForEach-Object {
+    $r = Invoke-RestMethod -Headers $cab "http://localhost:8090/api/consultas/$_"
+    "{0,-26} {1,3} filas" -f $_, $r.total
+}
+```
+
+Tres de las diez pueden responder `0 filas` con los datos sembrados, y **no
+es un error**: preguntan por lo que no existe. Para que respondan:
+
+```powershell
+# Un producto que nadie compra
+Invoke-RestMethod -Method Post -Headers $cab -ContentType 'application/json' `
+  -Uri http://localhost:8090/api/producto `
+  -Body '{"codigo":"PRZZ","nombre":"Sin vender","stock":5,"valorunitario":99000}'
+
+# Una factura anulada
+$f = Invoke-RestMethod -Method Post -Headers $cab -ContentType 'application/json' `
+     -Uri http://localhost:8090/api/factura `
+     -Body '{"fkidcliente":1,"fkidvendedor":1,"detalle":[{"codigo":"PR002","cantidad":1}]}'
+Invoke-RestMethod -Method Post -Headers $cab `
+  "http://localhost:8090/api/factura/$($f.factura.numero)/anular"
+
+# Una ruta a la que no llega nadie
+Invoke-RestMethod -Method Post -Headers $cab -ContentType 'application/json' `
+  -Uri http://localhost:8090/api/ruta `
+  -Body '{"ruta":"/reportes-huerfanos","descripcion":"Sin rol asignado"}'
+```
+
+## 6. Las diez contra los TRES motores, sin tocar nada
+
+```powershell
+docker exec -e MOTOR=mariadb   proyecto_php4-api-facturas-1 php /app/pruebas/prueba_consultas_tres_motores.php
+docker exec -e MOTOR=postgres  proyecto_php4-api-facturas-1 php /app/pruebas/prueba_consultas_tres_motores.php
+docker exec -e MOTOR=sqlserver proyecto_php4-api-facturas-1 php /app/pruebas/prueba_consultas_tres_motores.php
+```
+
+La prueba no mira el código de respuesta: mira las **columnas** y el
+**valor** del ticket promedio. Un error que revienta se arregla el mismo día;
+uno que responde 200 con un número redondo se queda meses.
+
+## 7. El front
+
+```
+http://localhost:8088
+```
+
+Sin sesión, cualquier dirección lleva a `/entrar`. Entre como `vendedor1` y
+haga una cosa: **escriba a mano `http://localhost:8088/productos`**. El menú
+no tiene ese enlace y la pantalla se abre igual... con el 403 que respondió
+la API adentro. Esconder un botón no es control de acceso.

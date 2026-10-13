@@ -1,4 +1,4 @@
-# Contratos — Versión 4: los mismos, por tercera vez
+# Contratos — Versión 4: los seis de siempre, cinco nuevos y diez consultas
 
 > **Versión 4** · En PHP puro no hay Swagger automático: **este documento ES
 > el contrato publicado** (y el endpoint `/` lo enlaza).
@@ -410,7 +410,7 @@ limpiar; en un sistema real esta operación probablemente no estaría.
         "motor": "mariadb",          ← "mariadb", "postgres" o "sqlserver"
         "recursos": ["/api/producto", "/api/empresa", "/api/persona",
                      "/api/cliente", "/api/vendedor", "/api/factura"],
-        "contratos": "docs/spec_kit/versiones/v4_sqlserver/6_contracts.md" }
+        "contratos": "docs/spec_kit/versiones/v4_aplicativo/6_contracts.md" }
 ```
 
 **Es el único sitio de toda la API donde se menciona el motor.** Ninguna otra
@@ -526,3 +526,246 @@ Compare-Object (Get-Content mariadb.json) (Get-Content sqlserver.json)
 
 **Y con eso la ruta de versiones se cierra.** No hay v5: un cuarto motor no
 enseñaría nada que la tercera columna no haya mostrado ya.
+
+
+---
+
+# ANEXO A LA v4 — LOS CONTRATOS QUE SE AGREGARON
+
+Todo lo de arriba sigue en pie: los seis recursos de la v2 responden lo mismo
+por tercera vez, y **esa estabilidad es el resultado que la versión persigue**.
+Lo que cambia es que ahora hay que identificarse para llegar a ellos, y que
+hay once recursos y diez consultas en vez de seis recursos.
+
+Los códigos y los sobres de este anexo salieron de peticiones de verdad
+contra la API en marcha, no de leer el código.
+
+## 0. La regla nueva que afecta a TODO lo anterior
+
+**Desde la v4 cada petición lleva la cabecera `Authorization: Bearer <token>`.**
+Hay exactamente dos rutas abiertas, y cada una tiene su razón:
+
+| Ruta abierta | Por qué |
+|---|---|
+| `GET /` | Es el diagnóstico. Un *healthcheck* que necesita credenciales no sirve de healthcheck: Docker lo usa para saber si el servicio está vivo |
+| `POST /api/sesion` | Es la puerta. No puede exigir el token que ella misma entrega |
+
+Cualquier otra ruta sin token responde **401** con el sobre de siempre. Con
+token válido pero sin permiso para ese recurso, **403**. La diferencia
+importa: 401 es «no sé quién es usted», 403 es «sé quién es y no le toca».
+
+```
+401  {"estado":401,"mensaje":"No hay una sesion valida.",
+      "detalle":"Falta la cabecera Authorization: Bearer <token>."}
+
+403  {"estado":403,"mensaje":"Su rol no tiene permiso para esta operacion.",
+      "detalle":"El usuario vendedor1@correo.com no alcanza la ruta /usuario."}
+```
+
+## 1. `POST /api/sesion` — entrar
+
+**Petición**
+
+```json
+{"email": "admin@correo.com", "contrasena": "admin123"}
+```
+
+**Respuesta 200**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBjb3JyZW8uY29tIiwi...",
+  "email": "admin@correo.com",
+  "roles": ["Administrador"],
+  "expira": "2026-10-10T19:21:00+00:00"
+}
+```
+
+**Errores**
+
+| Código | Cuándo |
+|---|---|
+| 401 | El correo no existe **o** la contraseña no coincide. **Un solo mensaje para los dos casos**: decir «ese correo no existe» le confirma a quien prueba al azar que los demás sí existen |
+| 422 | Falta el correo o la contraseña en el cuerpo |
+
+El token es un **JWT HS256 firmado, no cifrado**: su contenido se lee con
+cualquier decodificador de base64. Lo que nadie puede es cambiarlo sin
+romper la firma. Por eso dentro no hay ningún dato secreto.
+
+## 2. Los otros tres verbos de la sesión
+
+| Verbo y ruta | Qué hace | Exige token |
+|---|---|---|
+| `GET /api/sesion` | Dice quién está dentro: `{"email": ..., "roles": [...]}`. El correo sale **del token**, no de la URL ni del cuerpo | Sí |
+| `DELETE /api/sesion` | Salir. Es cortesía, y hay que saber por qué: **un JWT firmado no se puede apagar desde el servidor** sin una lista negra. Lo que de verdad cierra la sesión es que el cliente tire el token | Sí |
+| `POST /api/sesion/renovar` | Devuelve un token nuevo a quien ya tiene uno válido | Sí |
+
+## 3. `GET /api/permisos/mios` — las rutas de quien pregunta
+
+```json
+{"consulta": "mis rutas", "email": "vendedor1@correo.com",
+ "roles": ["Cajero", "Vendedor"], "total": 3,
+ "datos": ["/cliente", "/factura", "/home"]}
+```
+
+Existe **para que el front arme su menú** y no para decidir nada: el front
+usa esta lista para no ofrecer lo que va a ser rechazado. La decisión de
+dejar pasar la sigue tomando la API en cada petición.
+
+## 4. `/api/rol` y `/api/ruta` — los cinco verbos
+
+Los dos se comportan como los seis recursos de la v2, con la llave numérica
+que genera la base de datos:
+
+| Verbo | Ruta | Respuesta |
+|---|---|---|
+| GET | `/api/rol` | `{"tabla":"rol","limite":N,"total":N,"datos":[{"id":1,"nombre":"Administrador"}]}` |
+| GET | `/api/rol/{id}` | la ficha, o 404 |
+| POST | `/api/rol` | **201** con la ficha creada |
+| PUT | `/api/rol/{id}` | 200 |
+| PATCH | `/api/rol/{id}` | 200 |
+| DELETE | `/api/rol/{id}` | 200, o **409** si hay filas que dependen |
+
+`/api/ruta` es igual, con `{"id":1,"ruta":"/home","descripcion":"..."}`.
+
+Y una advertencia de vocabulario que ha costado tiempo: **«ruta» aquí es una
+interfaz del sistema a la que se da permiso** —`/factura`—, no la dirección
+de una pantalla del front —`/facturas`—. El singular es el permiso; el
+plural, la pantalla.
+
+## 5. `/api/usuario` — y lo que NO devuelve
+
+```json
+{"tabla":"usuario","limite":2,"total":2,
+ "datos":[{"email":"admin@correo.com"},{"email":"jefe@correo.com"}]}
+```
+
+**La columna de la contraseña existe en la tabla y no sale de ahí.** No es
+que el front la esconda: la API no la devuelve, ni en la lista ni en la
+ficha. Compruébelo en Postman.
+
+| Verbo | Qué hace |
+|---|---|
+| POST | Crea la cuenta. La contraseña viaja **en claro** por el cuerpo y la API la hashea con bcrypt costo 12 antes de guardarla |
+| PUT | Reemplaza la ficha: correo **y** contraseña |
+| PATCH | Cambia solo lo que llegue —en la práctica, la contraseña— |
+| DELETE | Borra la cuenta |
+
+Hay además `POST /api/usuario/verificar-contrasena`, que dice si una
+contraseña coincide **sin** entregar un token: sirve para pedir confirmación
+antes de una operación delicada.
+
+**¿Por qué no se hashea en el front?** Porque entonces el hash **sería** la
+contraseña —quien lo copiara entraría— y la API no podría imponer su costo.
+El hash se hace donde se guarda.
+
+## 6. `/api/rutarol` y `/api/rol-usuario` — los dos puentes, con DOS verbos
+
+Y aquí el contrato dice algo que hay que leer dos veces: **a estos dos
+recursos les faltan el PUT y el PATCH a propósito.**
+
+| Verbo | Ruta | Qué hace |
+|---|---|---|
+| GET | `/api/rutarol` | la lista, con los nombres resueltos: `{"fkidruta":4,"ruta":"/cliente","fkidrol":1,"rol":"Administrador"}` |
+| GET | `/api/rutarol/ruta/{id}` | los roles que alcanzan esa ruta |
+| GET | `/api/rutarol/rol/{id}` | las rutas que alcanza ese rol |
+| POST | `/api/rutarol` | da el permiso. **409** si la pareja ya existe |
+| DELETE | `/api/rutarol/{idRuta}/{idRol}` | lo quita. **La pareja entera es la llave**, y va en la dirección |
+
+En el código los dos verbos que faltan **están escritos y comentados**, con
+la razón al lado: una fila de estas tablas es una pareja de llaves foráneas
+sin ningún dato propio, así que «editarla» no significa nada —cambiarle el
+rol es quitar un permiso y dar otro, que son dos operaciones con dos
+efectos—. Dejarlos comentados en vez de borrarlos es deliberado: así la
+ausencia es visible y razonada, no un olvido.
+
+`/api/rol-usuario` es igual, con `fkemail` en lugar de `fkidruta`:
+`DELETE /api/rol-usuario/{email}/{idRol}`.
+
+## 7. `/api/usuario-con-roles` — el recurso de la v4
+
+El único que escribe en dos tablas con una sola petición.
+
+| Verbo | Ruta | Cuerpo / respuesta |
+|---|---|---|
+| GET | `/api/usuario-con-roles` | `{"tabla":"usuario_con_roles","total":8,"datos":[{"email":"...","roles":[{"idrol":1,"nombre":"Administrador"}]}]}` |
+| GET | `/api/usuario-con-roles/{email}` | la ficha con sus roles, o 404 |
+| POST | `/api/usuario-con-roles` | `{"email":"...","contrasena":"...","roles":[2,3]}` → **201** |
+| PUT | `/api/usuario-con-roles/{email}` | `{"contrasena":"...","roles":[3,4]}` → 200. Contraseña vacía = no se toca |
+| PATCH | `/api/usuario-con-roles/{email}` | solo lo que llegue → 200 |
+| DELETE | `/api/usuario-con-roles/{email}` | borra el usuario **y** sus roles → 200 |
+
+| Código | Cuándo | Medido |
+|---|---|---|
+| 201 | creado con sus roles | `{"estado":201,"mensaje":"Usuario creado exitosamente.","datos":{...}}` |
+| 409 | el correo ya existe, **o** un rol de la lista no existe | las dos cosas chocan con la integridad |
+| 422 | la contraseña no llega a 6 caracteres, o `roles` no es una lista |
+| 404 | el correo no existe (GET y DELETE) |
+
+**Y la garantía que hay que probar en la sustentación:** mande un rol que no
+exista y mire la base de datos después. No queda el usuario creado sin roles,
+ni el usuario sin los roles que tenía. El procedimiento lo deshace todo —y no
+siempre fue así: ver el tropiezo 5 de `4_research.md`—.
+
+## 8. `/api/consultas` — las diez
+
+Todas **GET**, todas con el permiso `/home`, y el sobre es otro:
+
+```json
+{"consulta": "ventas-por-producto", "total": 8, "datos": [ ... ]}
+```
+
+`tabla` sería falso —ninguna sale de una sola— y `limite` no aplica: un
+reporte se devuelve entero o no sirve para sumar.
+
+| # | Ruta | Columnas que devuelve |
+|---|---|---|
+| 1 | `/api/consultas/ventas-por-producto` | `codigo, nombre, unidades, ingreso, facturas, clientes` |
+| 2 | `/api/consultas/ventas-por-cliente` | `id, cliente, email, facturas, comprado, unidades` |
+| 3 | `/api/consultas/ventas-por-vendedor` | `id, vendedor, carnet, facturas, vendido` |
+| 4 | `/api/consultas/ventas-por-empresa` | `codigo, empresa, clientes, facturas, facturado` |
+| 5 | `/api/consultas/ticket-por-vendedor` | `vendedor, facturas, total, ticket_promedio` |
+| 6 | `/api/consultas/productos-sin-vender` | `codigo, nombre, stock, valorunitario` |
+| 7 | `/api/consultas/anulaciones-por-cliente` | `cliente, anuladas, valor_anulado` |
+| 8 | `/api/consultas/alcance-de-usuarios` | `email, roles, interfaces, sus_roles` |
+| 9 | `/api/consultas/interfaces-sin-usuarios` | `id, ruta, descripcion, roles_con_acceso, usuarios_con_acceso` |
+| 10 | `/api/consultas/credito-contra-consumo` | `cliente, empresa, credito, consumido, disponible` |
+
+**Los nombres de esas columnas son parte del contrato**, y no los vigila
+ningún tipo: si el SQL renombra una, el tablero cambia de encabezado y nadie
+se enteraría. Por eso existe `pruebas/prueba_consultas_tres_motores.php`, que
+los comprueba uno por uno en los tres motores.
+
+Y `GET /api/consultas` devuelve el índice de las diez
+—`{"nombre": ..., "titulo": ...}`— para que el front no las tenga escritas a
+mano: dos listas que hay que acordarse de cambiar a la vez son una lista de
+más.
+
+**Cero filas no es un error.** Tres de las diez preguntan por lo que *no*
+existe —productos que nunca se vendieron, facturas anuladas, rutas a las que
+no llega nadie— y con los datos sembrados responden `total: 0` con toda la
+razón.
+
+Un POST, PUT, PATCH o DELETE a cualquiera de las diez responde **405**: una
+consulta no tiene nada que crear ni que borrar.
+
+## 9. Las pantallas nuevas del front (`http://localhost:8088`)
+
+| Pantalla | Qué hace |
+|---|---|
+| `/entrar` | La única que se sirve sin sesión. Las tres cuentas del curso están impresas en ella |
+| `/salir` | Solo **POST**: un GET que cierra la sesión lo dispara cualquier cosa que cargue una dirección |
+| `/tablero` · `/tablero/{consulta}` | El índice de las diez y una pantalla por consulta |
+| `/roles` · `/rutas` · `/usuarios` | Lista y formulario, el patrón de siempre |
+| `/permisos` · `/usuarios-roles` | Los dos puentes: **ver, dar y quitar**. Sin editar, por lo que dice la sección 6 |
+| `/usuarios-con-roles` | Lista con los roles en etiquetas, y un formulario con **casillas** |
+
+Y tres reglas del front que son del contrato, no del gusto:
+
+1. **sin sesión, todo redirige a `/entrar`** —y eso no protege los datos: los
+   protege la API—;
+2. el menú, las tarjetas del inicio y los botones se arman con
+   `GET /api/permisos/mios`: **esconder un enlace no es control de acceso**,
+   es no ofrecer lo que va a responder 403;
+3. la contraseña **no vuelve nunca a la pantalla**, ni al repintar un
+   formulario con error ni en un campo oculto.
