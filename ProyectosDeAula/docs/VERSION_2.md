@@ -23,8 +23,8 @@
 **Todas las tablas de su módulo operables desde la interfaz gráfica** —menos
 las del control de acceso, que son de la v3—, con:
 
-- **todo el CRUD pasando por procedimientos almacenados**,
-- **al menos un disparador** funcionando,
+- **al menos UNA relación maestro-detalle** funcionando de punta a punta,
+- **el CRUD de ese maestro-detalle pasando por procedimientos almacenados**,
 - **ninguna clave foránea digitada a mano**,
 - y los criterios de la v1 **todavía en verde**.
 
@@ -68,9 +68,16 @@ puente** —clave primaria compuesta, dos claves foráneas—.
 
 ---
 
-## 3. Las relaciones MAESTRO-DETALLE
+## 3. La relación MAESTRO-DETALLE — **se exige UNA**
 
-Las que cada módulo ya tiene en su esquema. **Busque las del suyo.**
+**Se pide UNA, completa y funcionando.** Abajo están las que cada módulo tiene
+en su esquema: **escoja una** —la que más use su módulo— y hágala bien. Las
+demás pueden quedar como CRUD corriente.
+
+> **Por qué una y no todas.** Un maestro-detalle bien hecho —con su
+> procedimiento, su envío único y su pantalla— enseña todo lo que hay que
+> aprender aquí. Cuatro a medias no enseñan más: enseñan lo mismo, peor hecho,
+> y se llevan el tiempo que necesita el resto de la versión.
 
 | Módulo | Maestro | Su detalle |
 |---|---|---|
@@ -104,10 +111,20 @@ donde haya que volver a elegir de qué maestro se trata.
 
 ---
 
-## 4. TODO el CRUD con procedimientos almacenados
+## 4. Procedimientos almacenados — **para el maestro-detalle**
 
-**Listar, consultar, crear, modificar y eliminar: los cinco, de todas las
-tablas, pasan por un procedimiento almacenado.**
+**Los cinco verbos del maestro-detalle que escogieron en la §3 pasan por
+procedimientos almacenados.** El resto de las tablas puede ir con SQL
+preparado en el repositorio, como en la v1.
+
+> **Por qué ahí y no en todo.** El maestro-detalle es el caso donde el
+> procedimiento gana algo de verdad: **recibe el detalle completo en un solo
+> envío y lo guarda en una transacción**. Un CRUD de una tabla no gana nada
+> con un procedimiento — se escribe igual de bien con una sentencia preparada,
+> y de hecho así está el resto del ejemplo.
+>
+> Si quieren hacer más tablas con procedimientos, nadie se lo impide. Lo que
+> se **exige** es el del maestro-detalle.
 
 | | |
 |---|---|
@@ -165,7 +182,7 @@ DELIMITER ;
 
 > **El procedimiento devuelve la fila COMO QUEDÓ GUARDADA**, no como la mandó
 > el formulario. Así su API responde con los valores por defecto que puso la
-> base y con lo que el disparador haya calculado.
+> base de datos y con lo que ella haya calculado.
 >
 > **Y si la llave la genera la base** (`AUTO_INCREMENT`), el valor se lee con
 > `LAST_INSERT_ID()` **ahí mismo, antes de cualquier otra sentencia**: cualquier
@@ -210,7 +227,24 @@ DELIMITER ;
 
 ---
 
-## 5. AL MENOS UN DISPARADOR — elija uno de estos
+## 5. Los disparadores NO se piden en esta versión
+
+**Esta versión no exige ningún disparador**, y conviene decir por qué, porque
+el ejemplo de clase sí los tiene y alguien va a preguntar.
+
+| | |
+|---|---|
+| **Qué se pide** | Que el maestro-detalle funcione: el detalle viaja en un solo envío y el procedimiento lo guarda completo o no lo guarda |
+| **Qué NO se pide** | Que un disparador recalcule totales, mantenga contadores o lleve bitácoras |
+| **Si lo quieren hacer igual** | Pueden. No suma ni resta en la nota de esta versión |
+
+> **El ejemplo de clase (`bdfacturas`) usa seis disparadores** para calcular
+> subtotales, descontar stock y devolverlo al anular. Léalos si quiere
+> entender cómo se hace — pero **no los copie a su módulo para cumplir un
+> criterio que no existe.**
+
+<details>
+<summary>Lo que decía esta sección antes, por si su módulo quiere usarlos de todos modos</summary>
 
 **Se exige mínimo uno, funcionando y comprobable.** Cinco propuestas; **elija
 al menos una**, o proponga la suya si su módulo pide otra cosa.
@@ -276,9 +310,10 @@ DELIMITER ;
 > `estudios_realizados` puede actualizar `docente` sin problema; si intentara
 > tocar `estudios_realizados`, la base responde el error **1442**.
 
-**Cómo se comprueba:** se hace la operación **por la interfaz** y se mira que
-el dato cambió **sin que la API lo haya enviado**. Si su código manda el total,
-el disparador no está demostrando nada.
+**Cómo se comprueba, si lo hacen:** se hace la operación **por la interfaz** y
+se mira que el dato cambió **sin que la API lo haya enviado**.
+
+</details>
 
 ---
 
@@ -400,8 +435,8 @@ Decídanla, pónganla en el servicio, y escríbanla en el `2_spec.md`.
 |---|---|---|
 | **1** | Las tablas de la v1 tienen CRUD completo y su interfaz | Se abre cada una: crear, editar, retirar |
 | **2** | Las tablas de la v2, también | Lo mismo, una por una |
-| **3** | **Los cinco verbos de todas las tablas pasan por procedimientos almacenados** | Se abre el repositorio: **no hay SQL escrito a mano**, solo `CALL` |
-| **4** | **Al menos un disparador funciona** | Se hace la operación por la interfaz y el dato cambia solo (§5) |
+| **3** | **Los cinco verbos del maestro-detalle escogido pasan por procedimientos almacenados** | Se abre el repositorio: ahí hay `CALL`, con sus parámetros en `?` |
+| **4** | **La relación maestro-detalle funciona de punta a punta**: se abre el maestro, se le agregan renglones y se guardan **en un solo envío** | Se agregan tres renglones y se mira la base de datos: están los tres, o no está ninguno |
 | **5** | Cada clave foránea se elige de un **desplegable cargado de la API** | El desplegable está **lleno** y muestra nombres, no códigos |
 | **6** | La clave foránea opcional acepta **«(ninguna)»** → `null` | Se crea un registro sin ella |
 | **7** | Crear un hijo con un padre inexistente responde **409** en castellano | Desde la colección de pruebas. **Un 500 es criterio fallado** |
@@ -443,7 +478,7 @@ seguir funcionando»: se corren.
 | | |
 |---|---|
 | **El spec kit de la v2** | `docs/spec_kit/versiones/v2_<nombre>/` con los mismos nueve documentos de la v1 **y la guía de IA**. Describe **solo el delta** |
-| **El script de la base** | Con el `ALTER` de `activo`, **los procedimientos** y **el disparador**, versionados ahí |
+| **El script de la base** | Con el `ALTER` de `activo` y **los procedimientos del maestro-detalle**, versionados ahí |
 | **El código** | Repositorios que **llaman** a los procedimientos |
 | **La interfaz gráfica** | Las pantallas de los recursos nuevos. **Una versión no está cerrada si la API responde y la interfaz no** |
 | **La colección de pruebas** | Con las peticiones nuevas, **incluidas las que tienen que fallar** |
@@ -473,7 +508,6 @@ seguir funcionando»: se corren.
 | | Qué pasa | Cómo se nota |
 |---|---|---|
 | **El `DELIMITER` olvidado** | El script se parte en el primer `;` del cuerpo. Las **tablas sí se crean** y los procedimientos no | La API responde *PROCEDURE … does not exist* — y uno busca el error en el PHP |
-| **El disparador de un solo evento** | En MariaDB cada disparador atiende uno. Escribir solo el del `INSERT` deja el contador mal | Retirar o editar un hijo no cambia el total |
 | **El cursor sin cerrar** | Un `CALL` que devolvió filas deja resultados pendientes en la conexión | La **siguiente** consulta falla con el error **2014** — lejos de donde está la causa |
 | **El SQLSTATE que no distingue** | 1452, 1062 y 1451 llegan todos como `'23000'` | Todos los rechazos responden el mismo mensaje, o todos caen en el 500 |
 | **El `(int) ''` que vale 0** | Un desplegable opcional vacío llega como cadena vacía, y `(int) ''` es `0` | 409 hablando de un padre `0` que nadie eligió |

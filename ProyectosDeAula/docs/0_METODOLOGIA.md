@@ -76,8 +76,8 @@ Las antiguas "entregas" ahora son **versiones** con spec kit propio:
 | **v3** | **JWT + sesiones + control de acceso por roles** + CRUD de usuario/rol/rol_usuario (solo admin) | Regresión v1-v2 + criterios + tag `v3` |
 | **v4** | Aplicativo completo: **10 consultas multitabla** (4+ tablas c/u), **dashboard**, **imagen corporativa con su manual de marca**, páginas corporativas, responsive/PWA y **publicación** en servidor gratuito | Regresión total + criterios + tag `v4` |
 
-> **El detalle de la versión 2 —procedimientos almacenados, disparadores,
-> maestro-detalle y claves foráneas— está en
+> **El detalle de la versión 2 —el maestro-detalle, sus procedimientos
+> almacenados y las claves foráneas— está en
 > [VERSION_2.md](VERSION_2.md).** Léalo antes de empezarla.
 
 ### 2.1 Calendario y evaluación del semestre (100%)
@@ -166,7 +166,7 @@ Un comentario que sirve dice **por qué**, no **qué**:
 | Comentario que no vale nada | Comentario que sí |
 |---|---|
 | `// recorre la lista de productos` | `// el detalle viaja en un solo envío y el procedimiento lo abre: UN viaje a la base de datos y UNA transacción — si fuera un INSERT por renglón, un fallo a mitad dejaría media factura` |
-| `// valida el stock` | `// el stock lo valida el DISPARADOR y no el servicio, porque también tiene que valer para quien entre por el administrador de la base de datos` |
+| `// valida el stock` | `// el stock lo valida la BASE DE DATOS y no el servicio, porque también tiene que valer para quien entre por el administrador de la base de datos` |
 
 > **La prueba de fuego de un comentario:** tápele el código y pregúntese si el
 > comentario sigue diciendo algo. Si solo repite el nombre del método, no
