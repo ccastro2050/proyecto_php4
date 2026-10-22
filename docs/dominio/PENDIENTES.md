@@ -135,6 +135,18 @@ sustentación sea «no está, por esto» y no un silencio.
 
 ## 4. Lo que falta de documentación
 
+### 4.0 El front no aplica el manual de marca
+
+Es **criterio de la v4** —«imagen corporativa con su manual de marca, y la
+interfaz gráfica lo cumple»— y hoy está en rojo: el front usa Bootstrap sin
+personalizar. `publico/estilos.css` tiene 23 líneas con dos reglas y ningún
+color de marca; `publico/marca.css` no existe; la barra dice «Empresa de
+Ejemplo» en el gris de Bootstrap.
+
+El manual con la paleta, las tipografías y los contrastes calculados está
+escrito en [`MANUAL_DE_MARCA.md`](MANUAL_DE_MARCA.md), §6, con los cinco
+pasos para aplicarlo.
+
 ### 4.1 La carpeta `docs/dominio/` está incompleta
 
 Los otros cuatro repos de la v4 traen 18 documentos de dominio —requisitos,
