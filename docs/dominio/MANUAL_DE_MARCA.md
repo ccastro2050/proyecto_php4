@@ -7,10 +7,12 @@
 > **La empresa es ficticia** —es el dominio del ejemplo del curso—, pero los
 > contrastes están **calculados**, no estimados.
 >
-> ⚠️ **Y hay que decirlo de entrada: el front de este repositorio TODAVÍA NO
-> aplica este manual.** Lo que hoy se ve es Bootstrap sin personalizar. La
-> §6 dice exactamente qué falta, y está anotado en
-> [`PENDIENTES.md`](PENDIENTES.md).
+> **Dónde vive de verdad:** en
+> [`front_php/publico/marca.css`](../../front_php/publico/marca.css), como
+> variables. Las pantallas usan la clase de Bootstrap de siempre
+> —`btn-primary`, `alert-danger`, `table-light`—, que ahora lee estos
+> valores: **un color que no esté en el manual sencillamente no existe en la
+> interfaz.**
 >
 > Versión 1.0 · 22 de octubre de 2026.
 
@@ -123,34 +125,32 @@ variable, nunca el valor:
 
 ---
 
-## 6. ⚠️ Lo que falta para que el front cumpla este manual
+## 6. Cómo está aplicado, y por qué así
 
-Medido hoy en `front_php/`:
+Aplicado el **22 de octubre de 2026**. Tres piezas:
 
-| | Estado |
+| Archivo | Qué hace |
 |---|---|
-| `publico/estilos.css` | **23 líneas** y dos reglas: el borde punteado y el campo de solo lectura. Ningún color de marca |
-| `publico/marca.css` | **No existe** |
-| La barra | `navbar-dark bg-dark` — el gris de Bootstrap, no azul cordillera |
-| El nombre | dice **«Empresa de Ejemplo»**, no «Los Andes ▲ comercial s.a.» |
-| Logosímbolo | no hay |
-| Fondo, tipografías, foco | los de Bootstrap |
+| `front_php/publico/marca.css` | Las seis variables de la §2, y el mapeo sobre las clases de Bootstrap |
+| `vistas/plantilla.php` | Lo carga **después** de Bootstrap, y pinta el logosímbolo en la barra |
+| `publico/estilos.css` | Sigue con sus dos reglas propias; no tiene ni un color |
 
-**Qué habría que hacer**, en orden:
+> **Por qué se sobreescriben las VARIABLES de Bootstrap y no las clases.** Las
+> diecisiete vistas ya usan `btn-primary`, `alert-danger`, `table-light`…
+> Cambiar la variable que esas clases leen tiñe las diecisiete pantallas sin
+> tocar una sola vista — y la vista número dieciocho que alguien escriba
+> mañana sale pintada sola. Si se hubieran reescrito las clases, cada pantalla
+> nueva habría que acordarse de pintarla.
 
-1. crear `publico/marca.css` con las seis variables de la §2;
-2. cargarlo **después** de Bootstrap en `vistas/plantilla.php`;
-3. poner el logosímbolo en la barra, con el nombre real;
-4. mapear los colores de la §4 sobre las clases de Bootstrap que ya usan las
-   vistas (`btn-primary`, `btn-outline-danger`, `alert-success`…);
-5. comprobar el resultado con la §7.
+**Lo comprobado el día de aplicarlo:**
 
-> **Esto es criterio de la v4** —«imagen corporativa con su manual de marca, y
-> la interfaz gráfica lo cumple»—, así que mientras no esté, la v4 de este
-> repositorio tiene ese criterio **en rojo**. Decirlo aquí es más útil que
-> escribir un manual que describa una interfaz que no existe.
-
----
+| | Resultado |
+|---|---|
+| Las 17 pantallas responden | **17 de 17 en 200** |
+| La barra, el logotipo, el isotipo y el descriptor | en la pantalla, con «Los Andes ▲ comercial s.a.» |
+| Colores escritos a mano en las vistas | **ninguno**: no hay un solo `#` de color en `vistas/` |
+| Los seis colores del manual | los seis, una vez cada uno, en `marca.css` |
+| El ámbar con texto encima | solo con `piedra`, nunca con blanco |
 
 ## 7. Cómo comprobar que la interfaz cumple el manual
 

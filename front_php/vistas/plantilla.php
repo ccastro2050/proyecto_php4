@@ -20,19 +20,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Facturas</title>
+  <title>Los Andes · Facturas</title>
   <link rel="stylesheet" href="/publico/bootstrap.min.css">
+  <?php /* La marca va DESPUES de Bootstrap: lo ultimo que se carga es lo que
+           manda. Las seis variables de `marca.css` son el manual —
+           docs/dominio/MANUAL_DE_MARCA.md — y las pantallas usan la clase de
+           Bootstrap de siempre, que ahora lee esos valores. */ ?>
+  <link rel="stylesheet" href="/publico/marca.css">
   <link rel="stylesheet" href="/publico/estilos.css">
 </head>
-<body class="d-flex flex-column min-vh-100 bg-body-tertiary">
+<body class="d-flex flex-column min-vh-100">
 
   <nav class="navbar navbar-expand navbar-dark bg-dark">
     <div class="container">
-      <a class="navbar-brand fw-semibold" href="/">
-        Facturas
-        <span class="fs-6 fw-normal text-white-50 ms-2 d-none d-sm-inline">
-          Empresa de Ejemplo
-        </span>
+      <?php /* EL LOGOSIMBOLO, con sus tres piezas y en su orden:
+               logotipo + isotipo + descriptor. El isotipo —el triangulo— es
+               la cordillera, y es lo unico que va en ambar: ese color no
+               lleva texto nunca (contraste 2.34, ver el manual §2). */ ?>
+      <a class="navbar-brand" href="/">
+        <span class="marca-logotipo">Los Andes</span>
+        <span class="marca-isotipo">&#9650;</span>
+        <span class="marca-descriptor d-none d-sm-inline">comercial s.a.</span>
       </a>
 
       <?php /* ==============================================================

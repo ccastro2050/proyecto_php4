@@ -135,10 +135,14 @@ sustentación sea «no está, por esto» y no un silencio.
 
 ## 4. Lo que falta de documentación
 
-### 4.0 El front no aplica el manual de marca
+### 4.0 ~~El front no aplica el manual de marca~~ — RESUELTO el 22 de octubre de 2026
 
-Es **criterio de la v4** —«imagen corporativa con su manual de marca, y la
-interfaz gráfica lo cumple»— y hoy está en rojo: el front usa Bootstrap sin
+**Ya está aplicado**: `front_php/publico/marca.css` con las seis variables,
+el logosímbolo en la barra y las 17 pantallas respondiendo. Lo que sigue
+describe cómo estaba antes.
+
+Era **criterio de la v4** —«imagen corporativa con su manual de marca, y la
+interfaz gráfica lo cumple»— y estaba en rojo: el front usa Bootstrap sin
 personalizar. `publico/estilos.css` tiene 23 líneas con dos reglas y ningún
 color de marca; `publico/marca.css` no existe; la barra dice «Empresa de
 Ejemplo» en el gris de Bootstrap.

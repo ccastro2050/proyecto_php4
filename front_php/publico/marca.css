@@ -1,0 +1,186 @@
+/* ======================================================================
+   marca.css — la identidad visual de Comercial Los Andes S.A.
+
+   LO QUE ESTE ARCHIVO ES: la única fuente de los colores del front. Las
+   pantallas usan la variable, **nunca el valor**, así que un color que no
+   esté aquí sencillamente no existe en la interfaz. Con diecisiete vistas,
+   un hex escrito a mano en cada una serían diecisiete sitios donde cambiarlo
+   y dieciséis donde olvidarlo.
+
+   DÓNDE VA: después de `bootstrap.min.css` en `vistas/plantilla.php`. Lo
+   último que se carga es lo que manda.
+
+   POR QUÉ SOBREESCRIBE VARIABLES DE BOOTSTRAP Y NO CLASES: las vistas ya
+   usan `btn-primary`, `alert-danger`, `table-light`… Cambiar la variable que
+   esas clases leen tiñe las diecisiete pantallas sin tocar una sola vista.
+   Si en vez de eso se hubieran reescrito las clases, cada vista nueva habría
+   que acordarse de pintarla.
+
+   EL MANUAL que esto implementa, con los contrastes calculados y las dos
+   reglas que salen de ellos:  docs/dominio/MANUAL_DE_MARCA.md
+   ====================================================================== */
+
+:root {
+  /* --- La paleta. Estos seis valores son el manual. --- */
+  --azul-cordillera: #17495B;   /* principal: barra, títulos, botón primario */
+  --verde-paramo:    #2F7D5C;   /* lo que salió bien */
+  --rojo-anulada:    #B4402F;   /* lo que falló o se anuló */
+  --piedra:          #4A4A4A;   /* texto corriente */
+  --ambar-cosecha:   #E39B2D;   /* SOLO acento: el isotipo y el foco */
+  --niebla:          #F4F2EC;   /* el fondo */
+
+  /* Dos derivados, para estados y bordes. No son colores nuevos: son el
+     mismo azul y el mismo rojo, más oscuros, para `:hover`. */
+  --azul-oscuro:     #0F3240;
+  --rojo-oscuro:     #8E3225;
+
+  /* --- Y lo mismo, dicho en el idioma de Bootstrap --- */
+  --bs-body-bg:    var(--niebla);
+  --bs-body-color: var(--piedra);
+  --bs-primary:    var(--azul-cordillera);
+  --bs-link-color: var(--azul-cordillera);
+  --bs-link-hover-color: var(--azul-oscuro);
+  --bs-border-color: #D9D5CA;
+
+  --bs-font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ----------------------------------------------------------------------
+   TIPOGRAFÍA
+   Georgia para el logotipo y los títulos: da peso institucional y está en
+   todos los sistemas, así que no cuesta una petición de red.
+   ---------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6,
+.navbar-brand {
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--azul-cordillera);
+}
+
+/* Los títulos SOBRE la barra son blancos: ahí el azul es el fondo. */
+.navbar .navbar-brand { color: #fff; }
+
+/* ----------------------------------------------------------------------
+   EL LOGOSÍMBOLO: logotipo + isotipo + descriptor, en ese orden
+   ---------------------------------------------------------------------- */
+.marca-logotipo {
+  font-variant: small-caps;
+  letter-spacing: 2px;
+}
+
+.marca-isotipo {
+  color: var(--ambar-cosecha);   /* el triángulo: la cordillera */
+}
+
+.marca-descriptor {
+  font-family: var(--bs-font-sans-serif);
+  font-size: .72em;
+  opacity: .8;
+}
+
+/* ----------------------------------------------------------------------
+   LA BARRA
+   ---------------------------------------------------------------------- */
+.navbar.bg-dark {
+  background-color: var(--azul-cordillera) !important;
+}
+
+/* ----------------------------------------------------------------------
+   BOTONES
+   El azul lleva texto blanco (contraste 9.81) y el rojo también (5.65).
+   ---------------------------------------------------------------------- */
+.btn-primary {
+  --bs-btn-bg: var(--azul-cordillera);
+  --bs-btn-border-color: var(--azul-cordillera);
+  --bs-btn-hover-bg: var(--azul-oscuro);
+  --bs-btn-hover-border-color: var(--azul-oscuro);
+  --bs-btn-active-bg: var(--azul-oscuro);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--azul-cordillera);
+  --bs-btn-border-color: var(--azul-cordillera);
+  --bs-btn-hover-bg: var(--azul-cordillera);
+  --bs-btn-hover-border-color: var(--azul-cordillera);
+}
+
+.btn-danger,
+.btn-outline-danger {
+  --bs-btn-color: var(--rojo-anulada);
+  --bs-btn-border-color: var(--rojo-anulada);
+  --bs-btn-hover-bg: var(--rojo-oscuro);
+  --bs-btn-hover-border-color: var(--rojo-oscuro);
+}
+
+.btn-danger {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--rojo-anulada);
+}
+
+.btn-success {
+  --bs-btn-bg: var(--verde-paramo);
+  --bs-btn-border-color: var(--verde-paramo);
+  --bs-btn-color: #fff;
+}
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--piedra);
+  --bs-btn-border-color: var(--piedra);
+  --bs-btn-hover-bg: var(--piedra);
+}
+
+/* ----------------------------------------------------------------------
+   AVISOS Y ETIQUETAS
+   ---------------------------------------------------------------------- */
+.alert-success {
+  --bs-alert-color: #1D5440;
+  --bs-alert-bg: #E6F1EB;
+  --bs-alert-border-color: var(--verde-paramo);
+}
+
+.alert-danger {
+  --bs-alert-color: #7A2B20;
+  --bs-alert-bg: #F7E8E5;
+  --bs-alert-border-color: var(--rojo-anulada);
+}
+
+.text-bg-primary { background-color: var(--azul-cordillera) !important; color: #fff !important; }
+.text-bg-success { background-color: var(--verde-paramo)    !important; color: #fff !important; }
+.text-bg-danger  { background-color: var(--rojo-anulada)    !important; color: #fff !important; }
+.text-bg-secondary { background-color: var(--piedra)        !important; color: #fff !important; }
+
+/* El ámbar NUNCA lleva texto blanco: con 2.34 no alcanza ni para texto
+   grande. Cuando se usa de fondo —la etiqueta de «sin roles»—, el texto va
+   en piedra. */
+.text-bg-warning {
+  background-color: var(--ambar-cosecha) !important;
+  color: var(--piedra) !important;
+}
+
+/* ----------------------------------------------------------------------
+   TABLAS
+   ---------------------------------------------------------------------- */
+.table-light {
+  --bs-table-bg: #EAE7DD;
+  --bs-table-color: var(--piedra);
+}
+
+/* Las cifras, monoespaciadas y a la derecha: así `2.500.000` y `150.000` se
+   comparan de un vistazo. Las vistas ya marcan esas celdas. */
+td.font-monospace, th.font-monospace { font-variant-numeric: tabular-nums; }
+
+/* ----------------------------------------------------------------------
+   EL FOCO — y esto es accesibilidad, no estética
+   El contorno que Bootstrap pone por defecto es del mismo azul del botón:
+   sobre un botón azul NO se ve, y quien navega con el teclado pierde el
+   rastro. En ámbar se ve sobre cualquiera de los cinco colores.
+   ---------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--ambar-cosecha) !important;
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
+/* ----------------------------------------------------------------------
+   EL PIE
+   ---------------------------------------------------------------------- */
+footer.border-top { background-color: #FBFAF7 !important; }
