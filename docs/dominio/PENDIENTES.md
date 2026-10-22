@@ -147,7 +147,10 @@ El manual con la paleta, las tipografías y los contrastes calculados está
 escrito en [`MANUAL_DE_MARCA.md`](MANUAL_DE_MARCA.md), §6, con los cinco
 pasos para aplicarlo.
 
-### 4.1 La carpeta `docs/dominio/` está incompleta
+### 4.1 ~~La carpeta `docs/dominio/` está incompleta~~ — RESUELTO el 22 de octubre de 2026
+
+**Ya están los 18**, con 38 enlaces internos y ninguno roto. Lo que sigue
+describe cómo estaba antes del 22 de octubre de 2026.
 
 Los otros cuatro repos de la v4 traen 18 documentos de dominio —requisitos,
 reglas de negocio, diseño de la base de datos, glosario, política de errores,
