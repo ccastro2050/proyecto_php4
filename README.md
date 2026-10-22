@@ -38,6 +38,24 @@ cero** en su propio proyecto.
 > |---|---|
 > | Lo que corría | **PHP 8.3.33** en la API y en el front — **vulnerable** |
 > | Lo que corre ahora | **PHP 8.3.36** (compilado el 21 de octubre de 2026) |
+>
+> Y de paso se revisaron **las otras cuatro imágenes** del compose, porque un
+> parche de PHP no sirve de nada si la base de datos se queda atrás. Las
+> cuatro tenían versión más nueva publicada:
+>
+> | Imagen | Estaba | Quedó |
+> |---|---|---|
+> | `mariadb:11` | 11.8.8 | **11.8.9** |
+> | `postgres:16-alpine` | — | **16.15** |
+> | `phpmyadmin:latest` | — | la del 21 de octubre de 2026 |
+> | `mcr.microsoft.com/mssql/server:2022-latest` | — | la última publicada |
+>
+> MariaDB y phpMyAdmin se recrearon en caliente; **los datos no se tocaron** —
+> están en su volumen—, y se comprobó después: 9 productos, 11 facturas y 8
+> usuarios, los mismos de antes. PostgreSQL y SQL Server están detenidos a
+> propósito (este repositorio corre hoy contra MariaDB); **tomarán la imagen
+> nueva cuando se levanten con `docker compose up -d`, no con
+> `docker start`** — `start` revive el contenedor viejo tal como estaba.
 > | Cómo se actualizó | `docker compose build --pull` y volver a levantar. El `Dockerfile` pide `php:8.3-cli`, que es una etiqueta móvil: **`--pull` es la parte que importa**, porque sin él Docker reusa la imagen vieja que ya tiene guardada |
 >
 > ```powershell
