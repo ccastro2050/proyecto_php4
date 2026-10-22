@@ -15,6 +15,65 @@ especificaciones. El repositorio siempre contiene la **versión en curso,
 funcionando** — usted la ejecuta, la estudia y luego la **reconstruye desde
 cero** en su propio proyecto.
 
+> ---
+>
+> ## 🔴 SEGURIDAD · actualice PHP antes de usar esto (21 de octubre de 2026)
+>
+> El 22 de octubre de 2026 PHP publicó parches para **dos vulnerabilidades
+> críticas** que permiten **ejecutar código en el servidor sin usuario ni
+> contraseña** — 9,2 sobre 10 en CVSS:
+>
+> | | |
+> |---|---|
+> | `CVE-2026-109618` | Ejecución remota por **corrupción al quedarse sin memoria**: si PHP se queda sin memoria a mitad de preparar una petición, al limpiarla trata esos datos a medias como si fueran válidos |
+> | `CVE-2026-109619` | Ejecución remota por **estado global obsoleto**: parte del estado de una petición sobrevive a su memoria, y la petición siguiente en ese mismo *worker* lo alcanza |
+>
+> **Las versiones con el parche son 8.2.35, 8.3.36, 8.4.27 y 8.5.12.**
+> Para 7.4, 8.0 y 8.1 —sin soporte oficial— se publicaron parches
+> excepcionales; si usa una de esas, lo que toca es subir de versión.
+>
+> ### Qué pasó en este repositorio, y qué se hizo
+>
+> | | |
+> |---|---|
+> | Lo que corría | **PHP 8.3.33** en la API y en el front — **vulnerable** |
+> | Lo que corre ahora | **PHP 8.3.36** (compilado el 21 de octubre de 2026) |
+> | Cómo se actualizó | `docker compose build --pull` y volver a levantar. El `Dockerfile` pide `php:8.3-cli`, que es una etiqueta móvil: **`--pull` es la parte que importa**, porque sin él Docker reusa la imagen vieja que ya tiene guardada |
+>
+> ```powershell
+> # 1. Qué versión está corriendo de verdad
+> docker exec proyecto_php4-api-facturas-1 php -v
+>
+> # 2. Traer la base parcheada y reconstruir
+> docker compose build --pull api-facturas front-php
+>
+> # 3. Volver a levantar SOLO esos dos (las bases de datos no se tocan)
+> docker compose up -d --no-deps api-facturas front-php
+>
+> # 4. Comprobar
+> docker exec proyecto_php4-api-facturas-1 php -v     # 8.3.36
+> docker exec proyecto_php4-front-php-1   php -v     # 8.3.36
+> ```
+>
+> **Instalar no basta: hay que reiniciar el proceso.** Un contenedor que
+> siga vivo con la versión vieja sigue siendo vulnerable por más que la
+> imagen nueva esté descargada. Por eso el paso 3.
+>
+> Y **lo mismo aplica a las versiones 1, 2 y 3** de esta ruta: sus
+> `Dockerfile` piden `php:8.3-cli` igual que este. El día que las levante,
+> hágalo con `--pull`.
+>
+> > **Lo que esto enseña, y por eso queda escrito aquí y no en un chat:** una
+> > dependencia no se elige una vez. `php:8.3-cli` parecía una decisión
+> > tomada en la v1 y resultó ser una **suscripción**: cada vez que el
+> > lenguaje publica un parche, hay que ir por él. Lo mismo vale para
+> > `mariadb`, `postgres` y `mssql/server`.
+>
+> *Fuente: aviso oficial de PHP, 22 de octubre de 2026 —
+> [php.net/ChangeLog-8.php](https://www.php.net/ChangeLog-8.php). La versión
+> parcheada se comprobó aquí: `docker run --rm php:8.3-cli php -v` responde
+> `PHP 8.3.36 (built: Oct 21 2026)`.*
+
 > 🐳 Esta variante corre sobre **Docker**. Para las salas SIN Docker existe
 > el repositorio gemelo
 > [proyecto_php_sin_docker](https://github.com/ccastro2050/proyecto_php_sin_docker)
