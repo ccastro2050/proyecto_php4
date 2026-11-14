@@ -1,9 +1,10 @@
-# Tutorial — Publicar el sistema en internet (PHP + MariaDB)
+# Tutorial — Publicar SU proyecto en internet (PHP + MariaDB)
 
-**Hasta aquí el proyecto corrió en su máquina**, con un solo `docker compose up`:
-seis contenedores que nacen juntos. **Aquí sale a internet** — y con una
-condición que no es menor: **sin cambiar de motor**. Lo que se publica es la
-misma MariaDB que usted entrega.
+**Este tutorial es para que usted publique el proyecto de su equipo**, no el
+del profesor. Todo lo que aquí aparece —las direcciones, los nombres de las
+carpetas, la base de datos, las contraseñas— **es de la corrida de ejemplo**,
+hecha con el proyecto de facturación del curso para poder tomar las capturas.
+**Donde vea esos valores, ponga los suyos.**
 
 | La pieza | Dónde va a quedar |
 |---|---|
@@ -11,10 +12,37 @@ misma MariaDB que usted entrega.
 | **La API** — PHP | **alwaysdata**, un sitio |
 | **El front** — PHP | **alwaysdata**, otro sitio |
 
-> **Todo en un solo proveedor, y sin Docker.** No porque Docker estorbe, sino
-> porque aquí no hace falta: alwaysdata **ya tiene PHP instalado**. Se suben
-> los archivos y corren. El `docker-compose.yml` del repositorio sigue siendo
-> para su máquina.
+> **Todo en un solo proveedor, gratis y sin Docker.** No porque Docker
+> estorbe, sino porque aquí no hace falta: alwaysdata **ya tiene PHP
+> instalado**. El `docker-compose.yml` del repositorio sigue siendo para su
+> máquina.
+
+### Antes de empezar: la tabla de SUS datos
+
+**Llene esta tabla antes del paso 1 y téngala al lado.** Cada vez que el
+tutorial muestre un valor del ejemplo, usted usa el de su fila.
+
+| Qué es | En el ejemplo | **El suyo** |
+|---|---|---|
+| Nombre de la cuenta (y subdominio) | `phpfacturas` → `phpfacturas.alwaysdata.net` | |
+| Contraseña de la cuenta (FTP, MySQL y SSH) | *(la que puso al crearla)* | |
+| Base de datos | `phpfacturas_bdfacturas` | |
+| Servidor de la base de datos | `mysql-phpfacturas.alwaysdata.net` | |
+| Script de la base de datos | `db/mariadb/init_hospedaje.sql` | |
+| Repositorio en GitHub | `github.com/ccastro2050/proyecto_php4` | |
+| Carpeta de la API dentro del repositorio | `api_facturas` | |
+| Carpeta del front dentro del repositorio | `front_php` | |
+
+### Lo que su proyecto necesita tener para que esto funcione
+
+| | Por qué |
+|---|---|
+| **Estar en GitHub**, y de preferencia público | el servidor lo clona de ahí. Si es privado, tendrá que autenticarse |
+| **Leer la conexión del entorno** (`getenv`), no escrita en el código | en el servidor los datos se ponen en el panel. Si su proyecto tiene la contraseña escrita adentro, **arréglelo antes de publicar** |
+| **Un `index.php` que enrute** en cada aplicación | es lo que hace que el `.htaccess` del paso 7 funcione |
+
+> **Si su proyecto es una sola aplicación** —sin API y front separados—, haga
+> únicamente el sitio del paso 5.1 y sáltese el 5.2: **todo lo demás es igual.**
 
 ---
 
@@ -168,19 +196,79 @@ Es **idéntico** a `db/mariadb/init.sql` salvo esos dos renglones. Mismas tablas
 mismas llaves foráneas, mismos seis disparadores, mismos dieciséis
 procedimientos y los mismos datos.
 
-### La lista de chequeo, para cuando el script sea el suyo
+### Cómo debe quedar SU `.sql` — con ejemplos de lo que falla
 
-**Un estudiante que publique su propio proyecto tiene que mirar cuatro cosas
-en su `.sql`:**
+**Abra su script y busque estas cinco cosas.** Cada una tumba la importación,
+y el mensaje de error casi nunca dice cuál es la causa de fondo.
 
-| Qué buscar | Por qué quitarlo |
+#### 1 · `CREATE DATABASE` — quitarlo
+
+```sql
+-- ✗ MAL: su usuario de hospedaje NO puede crear bases de datos
+CREATE DATABASE IF NOT EXISTS bdfacturas_mariadb_local
+    DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+> **El error que sale:** `#1044 - Access denied for user ... to database`.
+> La base de datos ya existe: usted la creó en el paso 2.
+
+#### 2 · `USE` — quitarlo
+
+```sql
+-- ✗ MAL: esa base de datos no existe en el servidor
+USE bdfacturas_mariadb_local;
+```
+
+> **El nombre real lleva el prefijo de su cuenta** (`phpfacturas_bdfacturas`),
+> y no lo escribe el script: lo escoge usted al hacer clic en la base de datos
+> antes de importar.
+
+#### 3 · El nombre de la base de datos pegado a las tablas — quitarlo
+
+```sql
+-- ✗ MAL                                   -- ✓ BIEN
+INSERT INTO bdfacturas.producto ...         INSERT INTO producto ...
+SELECT * FROM `bdfacturas`.`factura` ...    SELECT * FROM factura ...
+```
+
+> **Esto es lo que más se cuela** cuando el script salió de un export, y es
+> fácil de arreglar: busque el nombre de su base de datos local dentro del
+> archivo y bórrelo, dejando solo el nombre de la tabla.
+
+#### 4 · `DEFINER` — quitarlo
+
+```sql
+-- ✗ MAL: phpMyAdmin y Workbench lo agregan solos al exportar
+CREATE DEFINER=`root`@`localhost` PROCEDURE sp_insertar_factura ...
+
+-- ✓ BIEN
+CREATE PROCEDURE sp_insertar_factura ...
+```
+
+> **El error que sale:** `#1227 - Access denied; you need SUPER privilege`.
+> Usted no es `root` en el hospedaje, y **nadie puede crear objetos a nombre
+> de otro usuario.** Si su script tiene veinte procedimientos, son veinte
+> `DEFINER` que hay que borrar — en VS Code, `Ctrl+H` y reemplazar
+> ``DEFINER=`root`@`localhost` `` por nada.
+
+#### 5 · `CREATE USER` y `GRANT` — quitarlos
+
+```sql
+-- ✗ MAL: los usuarios de base de datos se crean en el panel, no en el script
+CREATE USER 'paradigmas'@'%' IDENTIFIED BY 'paradigmas123';
+GRANT ALL PRIVILEGES ON bdfacturas.* TO 'paradigmas'@'%';
+```
+
+#### Y dos que NO hay que tocar
+
+| | |
 |---|---|
-| `CREATE DATABASE ...` | el hospedaje ya la creó, y su usuario no puede crear otras |
-| `USE ...` | el nombre real lleva prefijo |
-| **`DEFINER=`root`@`localhost`**` | si exportó con phpMyAdmin o Workbench, **los procedimientos salen marcados a nombre de `root`** — y su usuario no puede crear objetos a nombre de otro. El script muere ahí |
-| `CREATE USER` / `GRANT` | los usuarios se crean desde el panel, no desde el script |
+| **`DELIMITER $$`** | déjelo. phpMyAdmin lo entiende, y sin él los procedimientos se parten en pedazos |
+| **Los disparadores y procedimientos** | **déjelos todos.** Son justamente lo que este hospedaje sí permite y otros no |
 
-**Todo lo demás se sube tal cual.**
+**Guarde el resultado con otro nombre** —en este proyecto es
+`db/mariadb/init_hospedaje.sql`— y **no borre el original**: el de su máquina
+sigue necesitando el `CREATE DATABASE`.
 
 ---
 
@@ -413,10 +501,39 @@ AH00128: File does not exist: /home/phpfacturas/www/api/sesion
 > desconcertante porque **el código está bien**. La aplicación no se equivocó:
 > no la llamaron.
 
-### La solución: cuatro renglones, uno por aplicación
+### Dónde va exactamente el `.htaccess`
 
-**El repositorio ya los trae** (`api_facturas/.htaccess` y
-`front_php/.htaccess`). Esto es lo que dicen:
+**Uno por aplicación, en la MISMA carpeta donde está el `index.php` que
+enruta** — es decir, en la carpeta que el sitio tiene como `directorio raíz`.
+
+```
+su-proyecto/                     ← el repositorio
+   api_facturas/                 ← lo que apunta www/api
+      index.php
+      .htaccess        ← AQUÍ UNO
+      controladores/
+      servicios/
+   front_php/                    ← lo que apunta www/front
+      index.php
+      .htaccess        ← AQUÍ EL OTRO
+      vistas/
+      publico/
+```
+
+| Dónde NO va | Por qué |
+|---|---|
+| En la raíz del repositorio | Apache **no la mira**: el sitio empieza en `www/api`, no más arriba |
+| En `~/www/` | tampoco: `www/api` y `www/front` son enlaces a otras carpetas |
+| Uno solo para los dos | son **dos sitios distintos**, y cada uno lee el suyo |
+
+**Y el nombre importa:** se llama `.htaccess`, con el punto adelante y sin
+extensión. En Windows, el Explorador se resiste a crear archivos que empiezan
+por punto — **créelo desde VS Code**, que no tiene ese problema.
+
+### Lo que lleva adentro — copie y pegue
+
+**El mismo contenido sirve para los dos** (el repositorio ya los trae, en
+`api_facturas/.htaccess` y `front_php/.htaccess`):
 
 ```apache
 RewriteEngine On
@@ -488,6 +605,114 @@ expira  : 2026-11-14T04:03:34+01:00
 
 ---
 
-> **En construcción.** Falta el paso 8 —la variable `URL_API` del front y la
-> prueba del sistema completo— que se escribe cuando se ejecute: este
-> documento no describe nada que no se haya hecho de verdad.
+## Paso 8 — Conectar el front con la API, y la prueba
+
+**Con el código arriba, el front abría pero no servía:**
+
+> **No se pudo completar la operación: El servicio no está disponible.
+> ¿Está arriba la API?**
+
+**Y la API sí estaba arriba.** Lo que pasaba es que el front la buscaba donde
+dice su valor por defecto —`http://localhost:8090`—, y **dentro del servidor
+`localhost` es el servidor mismo**: ahí no hay ninguna API escuchando.
+
+Es el mismo malentendido que en Docker se resuelve usando el nombre del
+servicio (`api-facturas`) en vez de `localhost`. Aquí se resuelve con la
+dirección pública.
+
+**`Web` → `Sitios`** → engranaje ⚙ del sitio **`phpfacturas.alwaysdata.net`**
+→ `Variables ambientales`:
+
+| KEY=VALUE | Para qué |
+|---|---|
+| **`URL_API=https://phpfacturas.alwaysdata.net`** | a qué dirección le habla el front. **Sin `/api` al final**: eso lo agrega el código al armar cada ruta (`/api/sesion`, `/api/producto`) |
+
+> **Ni una línea de PHP cambió entre su máquina y el servidor.** Lo único que
+> cambió fueron cuatro variables en un panel. Eso es lo que significa leer la
+> configuración del entorno en vez de escribirla en el código.
+
+### La prueba
+
+```
+https://phpfacturas.alwaysdata.net/entrar
+```
+
+Entre con `admin@correo.com` / `admin123`:
+
+![El sistema publicado y funcionando](docs/tutorial_publicar/img/21_sistema_publicado.png)
+
+**Está dentro como `admin@correo.com` · Administrador · alcanza 15 rutas de las
+15 declaradas.**
+
+### Lo que recorrió esa pantalla
+
+```
+su navegador
+   |  https
+front PHP        phpfacturas.alwaysdata.net          (Apache + PHP)
+   |  https
+API PHP          phpfacturas.alwaysdata.net/api      (otro sitio, otro proceso)
+   |  TCP
+MariaDB 11.8     mysql-phpfacturas.alwaysdata.net    (con sus 6 disparadores)
+```
+
+| | |
+|---|---|
+| **Tres piezas, un solo proveedor** | y **cero pesos** |
+| **Dos programas que se hablan por HTTP** | no es una aplicación partida en carpetas: el front puede caerse y la API sigue respondiendo |
+| **El motor es el mismo que usted entrega** | MariaDB, con llaves foráneas, procedimientos y disparadores. No hubo que cambiar de motor para poder publicar |
+
+---
+
+## Si algo falla
+
+### Al importar la base de datos
+
+| Lo que ve | Qué pasó |
+|---|---|
+| **`#1046 - No database selected`** | no hizo clic en la base de datos antes de `Import`: estaba importando *al servidor* (paso 4.1) |
+| **`#1044 - Access denied ... to database`** | dejó el `CREATE DATABASE` en el script |
+| **`#1227 - Access denied; you need SUPER privilege`** | dejó el `DEFINER=root@localhost` en algún procedimiento o disparador |
+| **`#1049 - Unknown database 'loquesea'`** | dejó el `USE`, o el nombre de su base local pegado a alguna tabla (`bdfacturas.producto`) |
+| **`#1064 - syntax error`** cerca de un `BEGIN` | borró el `DELIMITER $$`. Déjelo |
+| Importa, pero no aparecen los procedimientos | mire la pestaña `Routines`. Si está vacía, el error salió antes: lea el mensaje completo, no solo el final |
+
+### Al abrir los sitios
+
+| Lo que ve | Qué revisar |
+|---|---|
+| **`404 Not Found`** de Apache en una ruta | falta el `.htaccess`, está en la carpeta equivocada, o no llegó al servidor: `cd ~/repo && git pull` |
+| **`500`** en todo el sitio | un error en el `.htaccess` — casi siempre un comentario al final de una directiva. **Mire el registro**: `tail -n 15 ~/admin/logs/apache/*` |
+| **`403 Forbidden`** | el `directorio raíz` del sitio apunta a una carpeta que no existe, o el enlace `ln -s` quedó mal. Compruebe con `ls -l ~/www` |
+| **Página en blanco**, sin error | PHP se murió sin alcanzar a escribir. `tail -n 20 ~/admin/logs/php/*` |
+| **«El servicio no está disponible. ¿Está arriba la API?»** | falta `URL_API` en el sitio del front, o quedó con `/` al final, o sin `https://` |
+| El login falla pero la API responde | `DB_CLAVE`, o el nombre de la base de datos en `DB_DSN_MARIADB` |
+| La página se ve sin estilos | el CSS no está donde el HTML lo busca. Mire la pestaña `Red` del navegador: va a ver un 404 con la ruta exacta |
+| Cambié el código y el sitio sigue igual | el servidor tiene **su propia copia** del repositorio: `cd ~/repo && git pull` |
+| Cambié una variable de entorno y no pasó nada | hay que **guardar el sitio** en el panel; el cambio se aplica al guardar |
+
+**Los registros, que es donde está la respuesta:**
+
+```bash
+tail -n 20 ~/admin/logs/apache/*      # errores de Apache (404, 500, .htaccess)
+tail -n 20 ~/admin/logs/php/*         # errores de PHP
+```
+
+---
+
+## Lo que quedó demostrado
+
+| | |
+|---|---|
+| **Se puede publicar gratis con MySQL, pero hay que buscar** | y la búsqueda es parte del trabajo: cuatro de los cinco hospedajes revisados no servían, **y ninguno lo dice en su portada** |
+| **La lógica dentro de la base de datos tiene un costo** | seis disparadores y dieciséis procedimientos **descartaron solos** a InfinityFree y a TiDB. Es una decisión de diseño que limita dónde se puede publicar |
+| **Lo que cambia al publicar no es el código** | son cuatro variables de entorno y un `.htaccess` |
+| **Dos programas, dos sitios** | y por eso cada uno tiene sus propias variables: el front no sabe la contraseña de la base de datos, **y no tiene por qué saberla** |
+| **El repositorio puede ser público** | porque ninguna credencial vive adentro |
+| **Cuando algo falla, el registro lo dice** | las dos veces que se cayó hoy, la respuesta estaba en `~/admin/logs/apache/` y en ningún otro sitio |
+
+---
+
+**Versión 1.0** — escrito el 13 de noviembre de 2026, ejecutando cada paso.
+Las direcciones, la base de datos y las contraseñas de este documento son las
+de esa corrida; **las suyas van a ser otras.**
