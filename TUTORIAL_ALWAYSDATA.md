@@ -251,7 +251,243 @@ trg_prodfact_after_delete    AFTER   DELETE
 
 ---
 
-> **En construcción.** Los pasos 5 a 7 —subir la API y el front por FTP, la
-> configuración de la conexión y la prueba del sistema completo— se escriben a
-> medida que se ejecutan: este documento no describe nada que no se haya hecho
-> de verdad.
+## Paso 5 — Los dos sitios
+
+**El proyecto son dos programas**, así que en alwaysdata son **dos sitios**:
+
+| El sitio | Dirección | Carpeta en el servidor |
+|---|---|---|
+| **El front** | `phpfacturas.alwaysdata.net` | `www/front/` |
+| **La API** | `phpfacturas.alwaysdata.net/api` | `www/api/` |
+
+> **Y fíjese en lo que NO hizo falta: un segundo dominio.** La API vive en la
+> misma dirección, bajo la ruta `/api`. Eso funciona porque **todas las rutas
+> de esta API empiezan por `/api/`** —`/api/producto`, `/api/sesion`,
+> `/api/factura`—, así que lo que el navegador pide y lo que el enrutador
+> espera coinciden exactamente.
+>
+> **Si su API respondiera en `/producto` a secas**, este montaje no serviría y
+> tocaría pedir un subdominio aparte. Mire sus rutas antes de copiar esto.
+
+### 5.1 · El sitio del front
+
+**`Web` → `Sitios`.** Ya existe uno, creado con la cuenta:
+
+![La lista con un solo sitio](docs/tutorial_publicar/img/13_sitios_uno.png)
+
+**Ábralo con el engranaje ⚙** y cambie **una sola casilla**:
+
+![El sitio del front, con su raíz](docs/tutorial_publicar/img/14_sitio_front_raiz.png)
+
+| La casilla | **Lo que se escribe** | Para qué |
+|---|---|---|
+| `directorio raíz` | **`www/front/`** | viene en `www/`. Como vamos a tener dos aplicaciones, cada una necesita su carpeta |
+
+### 5.2 · El sitio de la API
+
+**`+ Agregar un sitio`:**
+
+![El sitio nuevo, el de la API](docs/tutorial_publicar/img/15_sitio_api_nuevo.png)
+
+| La casilla | **Lo que se escribe** |
+|---|---|
+| `Direcciones` | **`phpfacturas.alwaysdata.net/api`** ← con `/api` al final |
+| `Amable` (tipo) | `PHP` |
+| `directorio raíz` | **`www/api/`** |
+
+**Y antes de guardar**, en la misma página, **`Variables ambientales`**:
+
+![Las variables de entorno de la API](docs/tutorial_publicar/img/16_variables_api.png)
+
+```
+MOTOR=mariadb
+DB_DSN_MARIADB=mysql:host=mysql-phpfacturas.alwaysdata.net;port=3306;dbname=phpfacturas_bdfacturas;charset=utf8mb4
+DB_USUARIO=phpfacturas
+DB_CLAVE=la-contraseña-de-su-cuenta
+```
+
+| La variable | Qué es |
+|---|---|
+| `MOTOR` | el interruptor de la v4: con cuál de los tres motores habla la API |
+| `DB_DSN_MARIADB` | **dónde está la base de datos.** El host ya no es `mariadb` —el nombre del contenedor— sino el servidor de alwaysdata |
+| `DB_USUARIO` · `DB_CLAVE` | las credenciales |
+
+> **Y aquí está la diferencia que vale la clase:** esas credenciales quedaron
+> **en el panel del hospedaje, no en un archivo del repositorio**. El código
+> las lee con `getenv()`, igual que leía las del `docker-compose.yml`. **Por
+> eso el repositorio puede ser público sin exponer nada.**
+
+![Los dos sitios](docs/tutorial_publicar/img/17_dos_sitios.png)
+
+---
+
+## Paso 6 — Subir el código: el servidor clona el repositorio
+
+**En alwaysdata hay FTP, pero no lo vamos a usar.** Hay algo mejor: **SSH**, y
+con SSH el servidor se baja el código **directamente de GitHub**.
+
+> **Por qué es mejor que arrastrar archivos:** subir por FTP son miles de
+> archivos y media hora, y al día siguiente nadie se acuerda de cuáles cambió.
+> Con `git`, **actualizar es un comando**, y lo que está publicado es
+> exactamente lo que está en el repositorio. Ni un archivo de más.
+
+### 6.1 · Entrar
+
+**`Acceso remoto` → `SSH/SFTP`:**
+
+![El panel de SSH](docs/tutorial_publicar/img/18_ssh.png)
+
+**Y no hace falta instalar nada:** el recuadro amarillo trae el enlace
+**`a través de la web`**, que abre una terminal en el navegador.
+
+Usuario **`phpfacturas`** y la contraseña de la cuenta. **No se ve mientras la
+escribe** —ni puntos ni asteriscos—: es así a propósito.
+
+### 6.2 · Clonar
+
+```bash
+git clone https://github.com/ccastro2050/proyecto_php4.git ~/repo
+```
+
+![El repositorio clonado](docs/tutorial_publicar/img/19_git_clone.png)
+
+```
+Cloning into '/home/phpfacturas/repo'...
+Receiving objects: 100% (632/632), 14.93 MiB | 25.19 MiB/s, done.
+Updating files: 100% (287/287), done.
+```
+
+> **El estudiante pone aquí la dirección de SU repositorio.** Y si es privado,
+> tendrá que autenticarse; lo más simple para un curso es que sea público, que
+> es lo que hacemos aquí — **justamente porque las contraseñas no están
+> adentro.**
+
+### 6.3 · Los dos atajos
+
+**El código quedó en `~/repo`, pero los sitios buscan en `~/www/api` y
+`~/www/front`.** Esas dos carpetas todavía no existen:
+
+```bash
+ln -s ~/repo/api_facturas ~/www/api
+ln -s ~/repo/front_php ~/www/front
+ls -l ~/www
+```
+
+![Los dos enlaces creados](docs/tutorial_publicar/img/20_enlaces.png)
+
+```
+api   -> /home/phpfacturas/repo/api_facturas
+front -> /home/phpfacturas/repo/front_php
+```
+
+| | |
+|---|---|
+| **`ln -s` crea un atajo**, como el acceso directo de Windows | **no copia nada**: apunta |
+| Por eso el código vive **en un solo sitio** | y mañana, `cd ~/repo && git pull` actualiza **las dos aplicaciones de una vez** |
+
+---
+
+## Paso 7 — El `.htaccess`, y por qué sin él no funciona nada
+
+**Con el código subido, la API respondía esto:**
+
+```
+404 Not Found — The requested URL was not found on this server.
+```
+
+**Y no era culpa de la API: nunca llegó a ejecutarse.** En el registro de
+Apache (`~/admin/logs/apache/`) estaba escrito:
+
+```
+AH00128: File does not exist: /home/phpfacturas/www/api/sesion
+```
+
+### Qué está pasando
+
+| En su máquina | En el hospedaje |
+|---|---|
+| `php -S 0.0.0.0:8090 index.php` | **Apache** |
+| Ese último argumento convierte a `index.php` en **el router**: *todas* las peticiones entran por ahí | Apache lee la URL **como una ruta de archivos**: para `/api/sesion` busca una carpeta `api` con un archivo `sesion` adentro |
+
+> **Es el tropiezo número uno al publicar una API de PHP**, y es
+> desconcertante porque **el código está bien**. La aplicación no se equivocó:
+> no la llamaron.
+
+### La solución: cuatro renglones, uno por aplicación
+
+**El repositorio ya los trae** (`api_facturas/.htaccess` y
+`front_php/.htaccess`). Esto es lo que dicen:
+
+```apache
+RewriteEngine On
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L,QSA]
+```
+
+| El renglón | Qué hace |
+|---|---|
+| `RewriteEngine On` | enciende la reescritura de direcciones |
+| `!-f` y `!-d` | **solo** reescribir si lo pedido **no** es un archivo ni una carpeta que existan. Así el CSS y las imágenes se sirven directo, sin pasar por PHP |
+| `RewriteRule ^ index.php [L,QSA]` | todo lo demás, a `index.php`. `[L]` = última regla; `[QSA]` = conserva lo que venga después del `?` |
+
+### Y el segundo tropiezo, que costó otro rato
+
+**La primera versión de ese archivo llevaba los comentarios al final de la
+línea**, y el sitio entero empezó a responder **500**:
+
+```
+/home/phpfacturas/www/api/.htaccess: RewriteCond: bad flag delimiters
+```
+
+> **Apache no admite comentarios en la misma línea de una directiva.** Esto
+> está mal:
+>
+> ```apache
+> RewriteCond %{REQUEST_FILENAME} !-f    # no es un archivo
+> ```
+>
+> El servidor intenta leer ese texto como parte de la condición. **El
+> comentario va en su propio renglón**, siempre.
+>
+> **Y la lección de fondo no es el `.htaccess`: es dónde se mira.** Las dos
+> veces, la respuesta estaba escrita en `~/admin/logs/apache/` y en ningún
+> otro lado:
+>
+> ```bash
+> tail -n 15 ~/admin/logs/apache/*
+> ```
+
+### Traer el arreglo al servidor
+
+```bash
+cd ~/repo && git pull
+```
+
+**Y ahí sí, la API publicada contesta:**
+
+```powershell
+Invoke-RestMethod -Method Post -Uri https://phpfacturas.alwaysdata.net/api/sesion `
+  -ContentType "application/json" `
+  -Body '{"email":"admin@correo.com","contrasena":"admin123"}'
+```
+
+```
+token   : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+email   : admin@correo.com
+roles   : {Administrador}
+expira  : 2026-11-14T04:03:34+01:00
+```
+
+> **Ese token prueba el camino completo:** Apache recibió la petición, se la
+> pasó a `index.php`, el enrutador llamó al controlador de sesión, el
+> repositorio consultó la tabla `usuario` **en la MariaDB de alwaysdata**, y
+> volvió. Si cualquiera de los pasos anteriores estuviera mal, aquí no habría
+> token.
+
+---
+
+> **En construcción.** Falta el paso 8 —la variable `URL_API` del front y la
+> prueba del sistema completo— que se escribe cuando se ejecute: este
+> documento no describe nada que no se haya hecho de verdad.
