@@ -17,8 +17,11 @@
 
 RewriteEngine On
 
-RewriteCond %{REQUEST_FILENAME} !-f    # no es un archivo que exista
-RewriteCond %{REQUEST_FILENAME} !-d    # ni una carpeta que exista
+# Solo se reescribe si lo pedido no es un archivo (!-f) ni una carpeta (!-d)
+# que existan. Y el comentario va aparte: Apache no admite comentarios al
+# final de una directiva (responde 500 en todo el sitio).
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L,QSA]
 
 <FilesMatch "^(Dockerfile|\.gitignore|.*\.md)$">

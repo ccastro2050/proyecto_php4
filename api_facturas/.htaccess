@@ -24,11 +24,18 @@
 # Encender el motor de reescritura de URLs.
 RewriteEngine On
 
-# Las dos condiciones: solo reescribir si lo pedido NO es...
-RewriteCond %{REQUEST_FILENAME} !-f    # ...un archivo que exista
-RewriteCond %{REQUEST_FILENAME} !-d    # ...ni una carpeta que exista
+# Las dos condiciones: solo reescribir si lo pedido NO es un archivo que
+# exista (!-f) ni una carpeta que exista (!-d). Así, un archivo estático de
+# verdad se sirve directo y no pasa por PHP.
 #
-# Así, un archivo estático de verdad se sirve directo y no pasa por PHP.
+# OJO: el comentario va en SU PROPIO RENGLON. Apache no admite comentarios al
+# final de una directiva: si uno escribe
+#     RewriteCond %{REQUEST_FILENAME} !-f    # comentario
+# el servidor intenta leer ese texto como parte de la condicion y responde
+# 500 en TODAS las paginas. El registro lo dice claro -«bad flag
+# delimiters»- pero hay que saber dónde mirar: ~/admin/logs/apache/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 
 # Y entonces: todo lo demás, a index.php.
 #   ^        cualquier ruta
