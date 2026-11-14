@@ -1,0 +1,26 @@
+# ==============================================================
+# .htaccess del FRONT — el mismo problema y la misma solución.
+#
+# En su máquina el front corre con
+#     php -S 0.0.0.0:8088 index.php
+# y ese `index.php` atiende /login, /productos, /facturas…
+#
+# Apache, en cambio, busca una carpeta `login` y un archivo adentro.
+# No existe: 404. Esta regla le dice que todo lo que no sea un archivo
+# real se lo entregue a index.php, que es quien sabe enrutar.
+#
+# La única diferencia con el .htaccess de la API: aquí SÍ hay archivos
+# estáticos de verdad —el CSS y Bootstrap, en `publico/`— y esos tienen
+# que servirse directo, sin pasar por PHP. De eso se encargan las dos
+# condiciones de abajo.
+# ==============================================================
+
+RewriteEngine On
+
+RewriteCond %{REQUEST_FILENAME} !-f    # no es un archivo que exista
+RewriteCond %{REQUEST_FILENAME} !-d    # ni una carpeta que exista
+RewriteRule ^ index.php [L,QSA]
+
+<FilesMatch "^(Dockerfile|\.gitignore|.*\.md)$">
+    Require all denied
+</FilesMatch>

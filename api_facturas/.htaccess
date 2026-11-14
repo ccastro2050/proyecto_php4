@@ -1,0 +1,47 @@
+# ==============================================================
+# .htaccess — PARA QUE APACHE SE COMPORTE COMO EL SERVIDOR DE PHP
+#
+# POR QUÉ EXISTE ESTE ARCHIVO, Y POR QUÉ NO HIZO FALTA ANTES:
+#
+# En su máquina, la API arranca con
+#     php -S 0.0.0.0:8090 index.php
+# Ese último argumento convierte a `index.php` en EL ROUTER: todas las
+# peticiones —/api/producto, /api/sesion, lo que sea— entran por ahí, y
+# el enrutador de index.php decide qué hacer. Eso es el patrón «front
+# controller».
+#
+# Apache NO funciona así. Apache mira la URL como si fuera una ruta de
+# archivos: para /api/producto va a buscar una carpeta `api` con un
+# archivo `producto` adentro. No existe, y responde 404 — aunque el
+# código esté perfecto. Es el primer tropiezo al publicar una API de PHP
+# en un hospedaje compartido, y no deja ninguna pista en los registros
+# de la aplicación, porque la aplicación nunca llegó a ejecutarse.
+#
+# Este archivo le enseña la misma regla: «si lo que piden no es un
+# archivo ni una carpeta de verdad, páseselo a index.php».
+# ==============================================================
+
+# Encender el motor de reescritura de URLs.
+RewriteEngine On
+
+# Las dos condiciones: solo reescribir si lo pedido NO es...
+RewriteCond %{REQUEST_FILENAME} !-f    # ...un archivo que exista
+RewriteCond %{REQUEST_FILENAME} !-d    # ...ni una carpeta que exista
+#
+# Así, un archivo estático de verdad se sirve directo y no pasa por PHP.
+
+# Y entonces: todo lo demás, a index.php.
+#   ^        cualquier ruta
+#   [L]      última regla, no sigas mirando
+#   [QSA]    conserva lo que venga después del ? (?limite=10)
+RewriteRule ^ index.php [L,QSA]
+
+# ==============================================================
+# LO QUE NO SE PUBLICA
+#
+# El repositorio trae archivos que no tienen por qué ser visibles desde
+# internet. Esto los bloquea aunque alguien adivine su nombre.
+# ==============================================================
+<FilesMatch "^(Dockerfile|\.gitignore|.*\.md)$">
+    Require all denied
+</FilesMatch>
